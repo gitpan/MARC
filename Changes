@@ -168,20 +168,26 @@ Revision history for Perl extension MARC.
 	  in 5.005 and fails in 5.004. Detected by CPAN-Testers
 	- Add tests for deletemarc() subfield to t/test2.t
 
-0.98   Fri Nov 12 21:13:39 CST 1999
+0.98   Fri Nov 12 21:13:39 CST 1999 <Birthisel>
 	- fix addfield reorder bug (new tag > existing)
 	- improved eg/addlocal.pl and added eg/uclocal.pl
 	- moved binmode from _readmarc* to openmarc() and new() to get around
 	  unwanted seek on binmode in Win32 5.00402.
 
-0.99   Sun Nov 14 21:59:00 EST 1999
+0.99   Sun Nov 14 21:59:00 EST 1999 <Summers>
         - created MARC::XML subclass to handle MARC<->XML conversions
         - moved _marc2xml() from MARC.pm into MARC::XML
 
-0.991  Sun Nov 21 18:49:00 EST 1999
+0.991  Sun Nov 21 18:49:00 EST 1999 <Summers>
         - removed MARC::XML specific pod from MARC.pm and added to MARC::XML
 
-1.00   Mon Nov 22 22:22:32 CST 1999
+1.00   Mon Nov 22 22:22:32 CST 1999 <Birthisel>
 	- add warnings for unsupported output formats
 	- return undef for output failure, test in place of XML
+
+1.01   Sun Dec 05 23:14:15 CST 1999 <Birthisel>
+	- add invalid size checks to _readmarc()
+	- add header check to _readmarcmaker()
+	- delete length() method and CORE::length() overrides
+	- add $TEST; replace carp with mycarp
 

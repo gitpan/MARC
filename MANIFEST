@@ -8,9 +8,11 @@ t/test1.t
 t/test2.t
 t/test3.t
 t/marc.dat
+t/badmarc.dat
 t/MARCopt.pm
 t/makrbrkr.mrc
 t/makrtest.src
+t/makrtest.bad
 t/brkrtest.ref
 eg/addlocal.pl
 eg/fixlocal.pl

@@ -4,14 +4,15 @@
 # `make test'. After `make install' it should work as `perl test1.t'
 
 use lib '.','./t';	# for inheritance and Win32 test
+use lib './blib/lib','../blib/lib','./lib','../lib','..';
 #### use lib './blib/lib','../blib/lib','./lib','../lib','..';
 # can run from here or distribution base
 
 ######################### We start with some black magic to print on failure.
 
-BEGIN { $| = 1; print "1..54\n"; }
+BEGIN { $| = 1; print "1..65\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use MARC 0.93;
+use MARC 1.01;
 $loaded = 1;
 print "ok 1\n";
 
@@ -57,12 +58,14 @@ sub is_bad {
 my $file = "makrbrkr.mrc";
 my $file2 = "brkrtest.ref";
 my $file3 = "makrtest.src";
+my $file4 = "makrtest.bad";
 
 my $testdir = "t";
 if (-d $testdir) {
     $file = "$testdir/$file";
     $file2 = "$testdir/$file2";
     $file3 = "$testdir/$file3";
+    $file4 = "$testdir/$file4";
 }
 unless (-e $file) {
     die "Missing sample file for MARCMaker tests: $file\n";
@@ -72,6 +75,9 @@ unless (-e $file2) {
 }
 unless (-e $file3) {
     die "Missing source file for MARCMaker tests: $file3\n";
+}
+unless (-e $file4) {
+    die "Missing bad source file for MARCMaker tests: $file4\n";
 }
 
 my $naptime = 0;	# pause between output pages
@@ -215,3 +221,24 @@ is_ok($records[0] == 3);					# 52
 is_ok(1 == scalar @records);					# 53
 is_ok($records[0] eq "|a8472236579");				# 54
 
+is_ok(3 == $x->deletemarc());					# 55
+is_zero($x->marc_count);					# 56
+
+$MARC::TEST = 1;
+is_ok('0 but true' eq $x->openmarc({file=>$file4,
+				    'format'=>"marcmaker"}));	# 57
+is_ok(-2 == $x->nextmarc(4));					# 58
+is_ok(2 == $x->marc_count);					# 59
+is_ok($x->closemarc);						# 60
+is_ok(2 == $x->deletemarc());					# 61
+
+if ($naptime) {
+    print "++++ page break\n";
+    sleep $naptime;
+}
+
+is_ok(2 == $x->openmarc({file=>$file4, increment=>2,
+			 'format'=>"marcmaker"}));		# 62
+is_bad(defined $x->nextmarc(1));				# 63
+is_ok(2 == $x->marc_count);					# 64
+is_ok($x->closemarc);						# 65

@@ -1,12 +1,13 @@
 package MARC;
 
-use Carp;
+require Carp;
 use strict;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG 
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST
 	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
 	    );
-$VERSION = '1.00';
+$VERSION = '1.01';
 $DEBUG = 0;
+$TEST = 0;
 
 require Exporter;
 require 5.004;
@@ -64,6 +65,10 @@ $LDR_TEMPLATE = "a5aaaaa3a5aaaaaaa";
 
 # Preloaded methods go here.
 
+sub mycarp {
+    Carp::carp (@_) unless $TEST;
+}
+
 ####################################################################
 # This is the constructor method that creates the MARC object. It  #
 # will call the appropriate read using the file and format         #
@@ -80,36 +85,36 @@ sub new {
 	# bless early so _readxxx can use methods
         #if file isn't defined then just return the empty MARC object
     if ($file) {
-        unless (-e $file) {carp "File $file doesn't exist"; return}
+        unless (-e $file) {mycarp "File $file doesn't exist"; return}
 	    #if the file doesn't exist return an error
         my $format = shift || "usmarc";
 	    # $format defaults to USMARC if undefined
         if ($format =~ /usmarc$/io) {
-	    open(*file, $file) or carp "Open Error: $file, $!";
+	    open(*file, $file) or mycarp "Open Error: $file, $!";
 	    binmode *file;
 	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'format'}='usmarc';
 	    $totalrecord = _readmarc($marc);
-	    close *file or carp "Close Error: $file, $!";
+	    close *file or mycarp "Close Error: $file, $!";
         }
         elsif ($format =~ /unimarc$/io) {
-	    open(*file, $file) or carp "Open Error: $file, $!";
+	    open(*file, $file) or mycarp "Open Error: $file, $!";
 	    binmode *file;
 	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'format'}='unimarc';
 	    $totalrecord = _readmarc($marc);
-	    close *file or carp "Close Error: $file, $!";
+	    close *file or mycarp "Close Error: $file, $!";
         }
         elsif ($format =~ /marcmaker$/io) {
-	    open (*file, $file) or carp "Open Error: $file, $!";
+	    open (*file, $file) or mycarp "Open Error: $file, $!";
 	    binmode *file;
 	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'lineterm'}="\015\012";	# MS-DOS default for MARCMaker
 	    $totalrecord = _readmarcmaker($marc);
-	    close *file or carp "Close Error: $file, $!";
+	    close *file or mycarp "Close Error: $file, $!";
         }
         else {
-	    carp "I don't recognize that format $!";
+	    mycarp "I don't recognize that format $!";
 	    return;
         }
     }
@@ -128,8 +133,23 @@ sub _readmarc {
     local $/ = "\035";	# cf. TPJ #14
     local $^W = 0;	# no warnings
     while (($increment==-1 || $recordcount<$increment) and my $line=<$handle>) {
+	my $recordlength = substr($line,0,5);
+	my $octets = length ($line);
 	$line=~s/[\n\r\cZ]//og;
 	last unless $line;
+	if ($recordlength =~ /\d{5}/o) {
+	    print "recordlength = $recordlength, length = $octets\n" if $DEBUG;
+	    unless ($recordlength == $octets) {
+	        mycarp "Invalid record, size does not match leader";
+		return unless ($recordcount);	# undef if first
+		return scalar (-$recordcount);	# if some are valid		
+	    }
+	}
+	else {
+	    mycarp "Invalid record, leader size not numeric";
+	    return unless ($recordcount);	# undef if first
+	    return scalar (-$recordcount);	# if some are valid		
+	}
 	my @d = ();
 	my $record={};
 	$record->{"array"}=[];
@@ -193,6 +213,11 @@ sub _readmarcmaker {
 	  #Split each record on the "\n=" into the @fields array
 	my @lines=split "$lineterm=",$record;
 	my $leader = shift @lines;
+	unless ($leader =~ /^=LDR  /o) {
+	    mycarp 'Invalid record, prefix "=LDR  " not found';
+	    return unless ($recordcount);	# undef if first
+	    return scalar (-$recordcount);	# if some are valid		
+	}
 	$leader=~s/^=LDR  //o;	#Remove "=LDR  "
 	$leader=~s/[\n\r]//og;
 	$leader=~s/\\/ /go;	# substitute " " for \
@@ -338,15 +363,9 @@ sub usmarc_default {
 }
 
 ####################################################################
-# length()/marc_count() returns the number of records in a         #
+# marc_count() returns the number of records in a                  #
 # particular MARC object                                           #
 ####################################################################
-sub length {
-    my $marc=shift;
-    carp "\$x->length() method deprecated, use \$x->marc_count()\n";
-    return $#$marc;
-}
-
 sub marc_count {
     my $marc=shift;
     return $#$marc;
@@ -361,7 +380,7 @@ sub openmarc {
     my $marc=shift;
     my $params=shift;
     my $file=$params->{file};
-    if (not(-e $file)) {carp "File \"$file\" doesn't exist"; return} 
+    if (not(-e $file)) {mycarp "File \"$file\" doesn't exist"; return} 
     $marc->[0]{'format'}=$params->{'format'}; #store format in object
     my $totalrecord;
     $marc->[0]{'increment'}=$params->{'increment'} || 0;
@@ -387,7 +406,7 @@ sub openmarc {
     }
     else {
 	close *file;
-	carp "Unrecognized format $marc->[0]{'format'}";
+	mycarp "Unrecognized format $marc->[0]{'format'}";
 	return;
     }
     print "read in $totalrecord records\n" if $DEBUG;
@@ -402,7 +421,10 @@ sub openmarc {
 sub closemarc {
     my $marc = shift;
     $marc->[0]{'increment'}=0;
-    if (not($marc->[0]{'handle'})) {carp "There isn't a MARC file to close"; return}
+    if (not($marc->[0]{'handle'})) {
+	mycarp "There isn't a MARC file to close";
+	return;
+    }
     my $ok = close $marc->[0]{'handle'};
     $marc->[0]{'handle'}=undef;
     return $ok;
@@ -418,7 +440,10 @@ sub nextmarc {
     my $marc=shift;
     my $increment=shift;
     my $totalrecord;
-    if (not($marc->[0]{'handle'})) {carp "There isn't a MARC file open"; return}
+    if (not($marc->[0]{'handle'})) {
+	mycarp "There isn't a MARC file open";
+	return;
+    }
     if ($increment) {$marc->[0]{'increment'}=$increment}
     if ($marc->[0]{'format'} =~ /usmarc/oi) {
 	$totalrecord = _readmarc($marc);
@@ -653,11 +678,11 @@ sub getvalue {
 	$params{$key} = shift;
     }
     my $record = $params{record};
-    if (not($record)) {carp "You must specify a record"; return}
-    if ($record > $#{$marc}) {carp "Invalid record specified"; return}
+    if (not($record)) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
     my $field = $params{field};
-    if (not($field)) {carp "You must specify a field"; return}
-    unless ($field =~ /^\d{3}$/) {carp "Invalid field specified"; return}
+    if (not($field)) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
     my $subfield = $params{subfield};
     my $delim = $params{delimiter};
     my @values;
@@ -830,7 +855,7 @@ sub _unpack_008 {
     my $ff_templ=$FF_TEMPLATE{$bib_format};
     my $raff_fields=$FF_FIELDS{$bib_format};
     if ($bib_format =~/UNKNOWN/) {
-        carp "Format is $bib_format";
+        mycarp "Format is $bib_format";
 	return;
     }
     my @fields=unpack($ff_templ,$ff_string);
@@ -971,22 +996,22 @@ sub output {
 	$output = _isbd($marc,$args);
     }
     elsif ($args->{'format'} =~ /xml/oi) {
-	carp "XML formats are now handled by MARC::XML" if ($^W);
+	mycarp "XML formats are now handled by MARC::XML" if ($^W);
 	return;
     }
     elsif ($args->{'format'}) {
-	carp "Unrecognized format specified for output" if ($^W);
+	mycarp "Unrecognized format specified for output" if ($^W);
 	return;
     }
     if ($args->{file}) {
 	if ($args->{file} !~ /^>/) {
-	    carp "Don't forget to use > or >> with output file name";
+	    mycarp "Don't forget to use > or >> with output file name";
 	    return;
 	}
-	open (OUT, "$args->{file}") || carp "Couldn't open file: $!";
+	open (OUT, "$args->{file}") || mycarp "Couldn't open file: $!";
         binmode OUT;
 	print OUT $output;
-	close OUT || carp "Couldn't close file: $!";
+	close OUT || mycarp "Couldn't close file: $!";
 	return 1;
     }
       #if no filename was specified return the output so it can be grabbed
@@ -1030,7 +1055,7 @@ sub _writemarc {
 		}
 	    }
 	    $fielddata.="\036";
-	    $fieldlength=_offset(CORE::length($fielddata),4);
+	    $fieldlength=_offset(length($fielddata),4);
 	    $fieldposition=_offset($position,5);
 	    $directory.=$tag.$fieldlength.$fieldposition;
 	    $position+=$fieldlength;
@@ -1038,9 +1063,9 @@ sub _writemarc {
 	}
 	$directory.="\036";
 	$fieldstream.="\035";
-	$fieldbase=24+CORE::length($directory);
+	$fieldbase=24+length($directory);
 	$fieldbase=_offset($fieldbase,5);
-	$recordlength=24+CORE::length($directory)+CORE::length($fieldstream);
+	$recordlength=24+length($directory)+length($fieldstream);
 	$recordlength=_offset($recordlength,5);
 	$leader=~s/^.{5}(.{7}).{5}(.{7})/$recordlength$1$fieldbase$2/;
 	$marcrecord.="$leader$directory$fieldstream";
@@ -1143,7 +1168,7 @@ sub _marcmaker {
 	# linebreak on by default
     my @output2 = ();
     foreach my $outline (@output) {
-	if (CORE::length($outline) < 66) {
+	if (length($outline) < 66) {
 	    push @output2, $outline;
 	    next;
 	}
@@ -1151,7 +1176,7 @@ sub _marcmaker {
 	    my @words = split (/\s{1,1}/, $outline);
 	    my $outline2 = shift @words;
 	    foreach my $word (@words) {
-		if (CORE::length($outline2) + CORE::length($word) < 66) {
+		if (length($outline2) + length($word) < 66) {
 		    $outline2 .= " $word";
 		}
 		else {
@@ -1423,11 +1448,11 @@ sub addfield {
     my $params=shift;
     local $^W = 0;	# no warnings
     my $record=$params->{record};
-    unless ($record) {carp "You must specify a record"; return}
-    if ($record > $#{$marc}) {carp "Invalid record specified"; return}
+    unless ($record) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
     my $field = $params->{field};
-    unless ($field) {carp "You must specify a field"; return}
-    unless ($field =~ /^\d{3}$/) {carp "Invalid field specified"; return}
+    unless ($field) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
 
     my $i1=$params->{i1};
     $i1 = ' ' unless (defined $i1);
@@ -1435,23 +1460,23 @@ sub addfield {
     $i2 = ' ' unless (defined $i2);
     my @value=$params->{value} || @_;
     if (ref($params->{value}) eq "ARRAY") { @value = @{$params->{value}}; }
-    unless (defined $value[0]) {carp "No value specified"; return}
+    unless (defined $value[0]) {mycarp "No value specified"; return}
 
     if ($field >= 10) {
         if ($value[0] eq 'i1') {
 	    shift @value;
 	    $i1 = shift @value;
         }
-        unless (1 == CORE::length($i1)) {
-	    carp "invalid \'i1\' specified";
+        unless (1 == length($i1)) {
+	    mycarp "invalid \'i1\' specified";
 	    return;
 	}
         if ($value[0] eq 'i2') {
 	    shift @value;
 	    $i2 = shift @value;
         }
-        unless (1 == CORE::length($i2)) {
-	    carp "invalid \'i2\' specified";
+        unless (1 == length($i2)) {
+	    mycarp "invalid \'i2\' specified";
 	    return;
 	}
     }
@@ -1511,11 +1536,11 @@ sub getupdate {
     my $marc=shift;
     my $params=shift;
     my $record=$params->{record};
-    unless ($record) {carp "You must specify a record"; return}
-    if ($record > $#{$marc}) {carp "Invalid record specified"; return}
+    unless ($record) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
     my $field = $params->{field};
-    unless ($field) {carp "You must specify a field"; return}
-    unless ($field =~ /^\d{3}$/) {carp "Invalid field specified"; return}
+    unless ($field) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
 
     foreach my $fields (@{$marc->[$record]{array}}) { #cycle each field 
 	next unless ($field eq $fields->[0]);
@@ -1557,14 +1582,14 @@ sub updaterecord {
     return if (defined $template->{value});
     my $count = 0;
     my @records = ();
-    unless ($marc->deletemarc($template)) {carp "not deleted\n"; return;}
+    unless ($marc->deletemarc($template)) {mycarp "not deleted\n"; return;}
     foreach my $y1 (@_) {
         unless ($y1 eq "\036") {
     	    push @records, $y1;
 	    next;
         }
         unless ($marc->addfield($template, @records)) {
-	    carp "not added\n";
+	    mycarp "not added\n";
 	    return;
 	}
         @records = ();
@@ -1581,7 +1606,7 @@ sub _offset{
     my $value=shift;
     my $digits=shift;
     print "DEBUG: _offset value = $value, digits = $digits\n" if ($DEBUG);
-    my $x=CORE::length($value);
+    my $x=length($value);
     $x=$digits-$x;
     $x="0"x$x."$value";
 }
@@ -1769,10 +1794,6 @@ A web interface to MARC.pm is available at
 http://libstaff.lib.odu.edu/cgi-bin/marc.cgi where you can upload records and
 observe the results. If you'd like to check out the cgi script take a look at
 http://libstaff.lib.odu.edu/depts/systems/iii/scripts/MARCpm/marc-cgi.txt However, to get the full functionality you will want to install MARC.pm on your server or PC.
-
-=head2 Notes
-
-
 
 =head2 Option Templates
 
@@ -2327,9 +2348,15 @@ happy to try to help. Also, please contact us if you notice any bugs, or
 if you would like to suggest an improvement/enhancement. Email addresses 
 are listed at the bottom of this page.
 
-Development of MARC.pm and other library oriented Perl utilities is conducted on the 
-Perl4Lib listserv. Perl4Lib is an open list and is an ideal place to ask questions 
-about MARC.pm. Subscription information is available at http://www.vims.edu/perl4lib
+Development of MARC.pm and other library oriented Perl utilities is conducted
+on the Perl4Lib listserv. Perl4Lib is an open list and is an ideal place to
+ask questions about MARC.pm. Subscription information is available at
+http://www.vims.edu/perl4lib
+
+Two global boolean variables are reserved for test and debugging. Both are
+"0" (off) by default. The C<$TEST> variable disables internal error messages
+generated using I<Carp>. It should only be used in the automatic test suite.
+The C<$DEBUG> variable adds verbose diagnostic messages.
 
 =head1 AUTHORS
 

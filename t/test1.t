@@ -4,14 +4,15 @@
 # `make test'. After `make install' it should work as `perl test1.t'
 
 use lib '.','./t';	# for inheritance and Win32 test
+use lib './blib/lib','../blib/lib','./lib','../lib','..';
 #### use lib './blib/lib','../blib/lib','./lib','../lib','..';
 # can run from here or distribution base
 
 ######################### We start with some black magic to print on failure.
 
-BEGIN { $| = 1; print "1..178\n"; }
+BEGIN { $| = 1; print "1..187\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use MARC 1.00;
+use MARC 1.01;
 $loaded = 1;
 print "ok 1\n";
 
@@ -61,12 +62,17 @@ sub filestring {
 }
 
 my $file = "marc.dat";
-my $testfile = "t/marc.dat";
-if (-e $testfile) {
-    $file = $testfile;
+my $file2 = "badmarc.dat";
+my $testdir = "t";
+if (-d $testdir) {
+    $file = "$testdir/$file";
+    $file2 = "$testdir/$file2";
 }
 unless (-e $file) {
     die "No MARC sample file found\n";
+}
+unless (-e $file2) {
+    die "Missing bad sample file for MARC tests: $file2\n";
 }
 
 my $naptime = 0;	# pause between output pages
@@ -192,14 +198,14 @@ my ($m100a) = $x->getvalue({field=>'100',record=>1,subfield=>'a'});
 my ($m100d) = $x->getvalue({field=>'100',record=>1,subfield=>'d'});
 my ($m100e) = $x->getvalue({field=>'100',record=>1,subfield=>'e'});
 
-is_ok($m100a eq "Twain, Mark,");				# 43
-is_ok($m100d eq "1835-1910.");					# 44
-is_bad(defined $m100e);						# 45
-
 if ($naptime) {
     print "++++ page break\n";
     sleep $naptime;
 }
+
+is_ok($m100a eq "Twain, Mark,");				# 43
+is_ok($m100d eq "1835-1910.");					# 44
+is_bad(defined $m100e);						# 45
 
 my @ind12 = $x->getvalue({field=>'246',record=>2,subfield=>'i12'});
 is_ok(3 == scalar @ind12);					# 46
@@ -231,6 +237,11 @@ is_ok($records[0] == 1);					# 61
 is_ok(1 == scalar @records);					# 62
 is_ok($records[0] == 2);					# 63
 
+if ($naptime) {
+    print "++++ page break\n";
+    sleep $naptime;
+}
+
 @records=$x->searchmarc({field=>"246",subfield=>"a"});
 is_ok(1 == scalar @records);					# 64
 is_ok($records[0] == 2);					# 65
@@ -238,11 +249,6 @@ is_ok($records[0] == 2);					# 65
 @records=$x->searchmarc({field=>"245",regex=>"/huckleberry/i"});
 is_ok(1 == scalar @records);					# 66
 is_ok($records[0] == 1);					# 67
-
-if ($naptime) {
-    print "++++ page break\n";
-    sleep $naptime;
-}
 
 @records=$x->searchmarc({field=>"260",subfield=>"c",regex=>"/19../"});
 is_ok(1 == scalar @records);					# 68
@@ -274,6 +280,11 @@ is_ok(21 ==  @u246);						# 80
 is_ok(1 == $x->searchmarc($update246));				# 81
 is_ok(3 == $x->deletemarc($update246));				# 82
 
+if ($naptime) {
+    print "++++ page break\n";
+    sleep $naptime;
+}
+
 is_ok($u246[0] eq "i1");					# 83
 is_ok($u246[1] eq "3");						# 84
 is_ok($u246[2] eq "i2");					# 85
@@ -281,11 +292,6 @@ is_ok($u246[3] eq "0");						# 86
 is_ok($u246[4] eq "a");						# 87
 is_ok($u246[5] eq "Photo archive");				# 88
 is_ok($u246[6] eq "\036");					# 89
-
-if ($naptime) {
-    print "++++ page break\n";
-    sleep $naptime;
-}
 
 is_ok($u246[7] eq "i1");					# 90
 is_ok($u246[8] eq "3");						# 91
@@ -303,6 +309,11 @@ is_ok($u246[18] eq "a");					# 101
 is_ok($u246[19] eq "AP photo archive");				# 102
 is_ok($u246[20] eq "\036");					# 103
 
+if ($naptime) {
+    print "++++ page break\n";
+    sleep $naptime;
+}
+
 is_ok ($y1 = $x->output({'format'=>"HTML_HEADER"}));		# 104
 my $header = "Content-type: text/html\015\012\015\012";
 is_ok ($y1 eq $header);						# 105
@@ -318,11 +329,6 @@ is_ok ($y1 eq $header);						# 109
 is_ok ($y1 = $x->output({'format'=>"HTML_FOOTER"}));		# 110
 $header = "\n</body></html>\n";
 is_ok ($y1 eq $header);						# 111
-
-if ($naptime) {
-    print "++++ page break\n";
-    sleep $naptime;
-}
 
 is_ok(0 == $x->searchmarc($update246));				# 112
 @records = $x->getupdate($update246);
@@ -352,6 +358,12 @@ is_ok($u246[6] eq "\036");					# 121
 
 is_ok($u246[7] eq "i1");					# 122
 is_ok($u246[8] eq "3");						# 123
+
+if ($naptime) {
+    print "++++ page break\n";
+    sleep $naptime;
+}
+
 is_ok($u246[9] eq "i2");					# 124
 is_ok($u246[10] eq " ");					# 125
 is_ok($u246[11] eq "a");					# 126
@@ -363,11 +375,6 @@ is_ok($u246[15] eq "3");					# 130
 is_ok($u246[16] eq "i2");					# 131
 is_ok($u246[17] eq "0");					# 132
 is_ok($u246[18] eq "a");					# 133
-
-if ($naptime) {
-    print "++++ page break\n";
-    sleep $naptime;
-}
 
 is_ok($u246[19] eq "AP photo archive");				# 134
 is_ok($u246[20] eq "\036");					# 135
@@ -398,6 +405,12 @@ is_ok(11 == @records);						# 143
 
 is_ok($records[0] eq "i1");					# 144
 is_ok($records[1] eq "6");					# 145
+
+if ($naptime) {
+    print "++++ page break\n";
+    sleep $naptime;
+}
+
 is_ok($records[2] eq "i2");					# 146
 is_ok($records[3] eq "7");					# 147
 is_ok($records[4] eq "z");					# 148
@@ -410,11 +423,6 @@ is_ok($records[10] eq "\036");					# 154
 
 @records = $x->getupdate({field=>'900',record=>2});
 is_ok(7 == @records);						# 155
-
-if ($naptime) {
-    print "++++ page break\n";
-    sleep $naptime;
-}
 
 is_ok($records[0] eq "i1");					# 156
 is_ok($records[1] eq "9");					# 157
@@ -432,6 +440,12 @@ is_ok($records[0] eq "i1");					# 164
 is_ok($records[1] eq "5");					# 165
 is_ok($records[2] eq "i2");					# 166
 is_ok($records[3] eq "3");					# 167
+
+if ($naptime) {
+    print "++++ page break\n";
+    sleep $naptime;
+}
+
 is_ok($records[4] eq "c");					# 168
 is_ok($records[5] eq "wL70");					# 169
 is_ok($records[6] eq "d");					# 170
@@ -448,3 +462,15 @@ is_ok(2 == @records);						# 176
 is_ok($records[0] eq "ocm40139019 ");				# 177
 is_ok($records[1] eq "\036");					# 178
 
+is_ok(2 == $x->deletemarc());					# 179
+is_zero($x->marc_count);					# 180
+
+$MARC::TEST = 1;
+is_ok('0 but true' eq $x->openmarc({file=>$file2,
+				    'format'=>"usmarc"}));	# 181
+is_ok(-1 == $x->nextmarc(2));					# 182
+is_ok(1 == $x->marc_count);					# 183
+is_bad(defined $x->nextmarc(1));				# 184
+is_ok(1 == $x->nextmarc(2));					# 185
+is_ok(2 == $x->marc_count);					# 186
+is_ok($x->closemarc);						# 187

@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.00, 22 November 1999
+VERSION=1.01, 05 December 1999
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -11,10 +11,12 @@ MARC.pm is a Perl 5 module for reading in, manipulating, and outputting
 bibliographic records in the USMARC format. You will need to have Perl
 5.004 or greater for MARC.pm to work properly. Since it is a Perl module
 you use MARC.pm from one of your own Perl scripts. It handles conversions
-from MARC into ASCII (text),  Library of Congress MARCMaker, HTML, XML,
+from MARC into ASCII (text),  Library of Congress MARCMaker, HTML,
 and ISBD. Input from MARCMaker format is also supported. Individual
 records, fields, indicators, and subfields can be created, modified, and
 deleted. It can extract URLs from the 856 field into HTML.
+
+The MARC::XML module adds conversions to and from XML.
 
 MARC.pm can handle both single and batches of MARC records. The limit on
 the number of records in a batch is determined by the memory capacity of
@@ -34,6 +36,7 @@ FILES:
 
     t			- test directory
     t/marc.dat		- two record data file for testing
+    t/badmarc.dat	- corrupt data file for testing
     t/test1.t		- basic tests, search, update
     t/test2.t		- MARCMaker format tests
     t/test3.t		- Inheritance version of test1.t
@@ -41,6 +44,7 @@ FILES:
     t/makrbrkr.mrc	- LoC. MARCMaker reference records
     t/makrtest.src	- MARCMaker source for makrbrkr.mrc
     t/brkrtest.ref	- MARCBreaker output from makrbrkr.mrc
+    t/makrtest.bad	- corrupt MARCMaker source file for testing
 
     eg			- test directory
     eg/microlif.001	- eighteen record data file for demo
@@ -49,6 +53,7 @@ FILES:
     eg/fixlocal.pl	- multi-field search and replace demo with comments
 			  and option templates
     eg/uclocal.pl	- complex modify/write demo with extensive use of
+			  templates and tutorial comments
 
 INSTALL and TEST:
 
