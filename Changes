@@ -78,3 +78,7 @@ Revision history for Perl extension MARC.
 	  on line 859.
 	- updated closemarc to return 1, to allow constructs like
 	  $x->closemarc() || die;
+
+0.9   Sun Oct 17 19:48:00 EST 1999
+	- modified deletemarc() to support deleting specified fields and subfields
+	- modified addfield() to support adding fields in tag order

@@ -3,7 +3,7 @@ package MARC;
 use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG);
-$VERSION = '0.85';
+$VERSION = '0.9';
 $DEBUG = 0;
 
 require Exporter;
@@ -259,33 +259,86 @@ sub nextmarc {
 }
 
 ####################################################################
-# deletemarc() will remove specific records from a marc object     #
-# you pass deletemarc() an array reference that contains a list of #
-# the records, or range of records that wish to delete. For example#
-# $x=$x->deletemarc(["1","5","9-15"]);                                #
+# deletemarc() will delete entire records, specific fields, as     #
+# well as specific subfields depending on what parameters are      #
+# passed to it                                                     #
 ####################################################################
 sub deletemarc {
-    my $marc1=shift;
-    my @marc1=@$marc1;
-    my @marc2;
-    my $delarray=shift;
-    my $count=0;
-    my $delcount=0;
-    if (not($delarray)) {$delarray->[0]="1-$#marc1"} 
-    foreach my $record (@marc1) {
-	my $match=0;
-	foreach my $delelement (@$delarray) {
-	    if ($delelement=~/(\d+)-(\d+)/) {
-		if ($count>=$1 and $count<=$2) {$match=1;last;}
+    my $marc=shift;
+    my $params=shift;
+    my $delrecords=$params->{record} || carp "error $!";
+       #if records parameter not passed set to all records in MARC object
+    if (not($delrecords)) {@$delrecords=(1..$#$marc)}
+    my $field=$params->{field};
+    my $subfield=$params->{subfield};
+    my $occurence=$params->{occurence};
+    my $deletecount=0;
+
+    #delete entire records
+    if (not($field) and not($subfield)) {
+	#my @marc1=@$marc;
+	my @newmarc;
+	my $count=0;
+	foreach my $record (@$marc) {
+	    my $match=0;
+	    foreach my $delelement (@$delrecords) {
+		if ($delelement==$count) {$match=1;last;}
 	    }
-	    elsif ($delelement==$count) {$match=1;last;}
+	    if (not($match)) {push(@newmarc,$record)}
+	    else {$deletecount++}
+	    $count++;
 	}
-	if (not($match)) {push(@marc2,$record)}
-	else {$delcount++}
-	$count++;
+	@$marc=@newmarc;
+	return $deletecount;
     }
-    @$marc1=@marc2;
-    return $delcount;
+
+    #delete fields
+    elsif ($field and not($subfield)) {
+	for (my $record=1; $record<=$#$marc; $record++) {
+	    foreach my $delelement (@$delrecords) {
+		if ($delelement != $record) {next}
+		if ($marc->[$record]{$field}) {
+		    foreach my $fieldref1 (@{$marc->[$record]{$field}{field}}) {
+			my $count=0;
+			foreach my $fieldref2 (@{$marc->[$record]{array}}) {
+			    if ($fieldref1 == $fieldref2) {
+				$deletecount++;
+				splice @{$marc->[$record]{array}},$count,1;
+				delete %$marc->[$record]{$field};
+			    }
+			    $count++;
+			}
+		    }
+		}
+	    }
+	}
+	return $deletecount;
+    }
+
+    #delete subfields
+    elsif ($subfield) {
+	for (my $record=1; $record<=$#$marc; $record++) {
+	    foreach my $delelement (@$delrecords) {
+		if ($delelement != $record) {next}
+		if ($marc->[$record]{$field}{$subfield}) {
+		    foreach my $subfieldref (@{$marc->[$record]{$field}{$subfield}}) {
+			foreach my $fieldref2 (@{$marc->[$record]{array}}) {
+			    my $count=0;
+			    foreach my $subfield2 (@$fieldref2) {
+				if ($$subfieldref eq $subfield2) {
+				    $deletecount++;
+				    splice @$fieldref2,$count-1,2;
+				    delete %$marc->[$record]{$field}{$subfield};
+				}
+				$count++
+			    }
+			}
+		    }
+		}
+	    }
+	}
+	return $deletecount;
+    }
 }
 
 ####################################################################
@@ -844,10 +897,27 @@ sub addfield {
     my $i1=$params->{i1} || " ";
     my $i2=$params->{i2} || " ";
     my $value=$params->{value};
+    my $ordered=$params->{ordered} || "y";
+    my $insertorder;
+       #if necessary figure out the insert order to preserve tag order
+    if ($ordered=~/y/i) {
+	for (my $i=0; $i<=$#{$marc->[$record]{array}}; $i++) {
+	    if ($marc->[$record]{array}[$i][0] > $field) {
+		$insertorder=$i;
+		last;
+	    }
+	    if ($insertorder==0) {$insertorder=1}
+	}
+    }
     my @field;
     if ($field<10) {
 	push (@field, $field, $value->[0]);
-	push (@{$marc->[$record]{array}},\@field);
+	if ($ordered=~/y/i) {
+	    splice @{$marc->[$record]{array}},$insertorder,0,\@field; 
+	}
+	else {
+	    push (@{$marc->[$record]{array}},\@field);
+	}
 	push (@{$marc->[$record]{$field}{field}},\@field); 
     }
     else {
@@ -858,7 +928,12 @@ sub addfield {
 	    push (@field, $sub_id, $subfield);
 	    push (@{$marc->[$record]{$field}{$sub_id}}, \$subfield);
 	}
-	push (@{$marc->[$record]{array}},\@field);
+	if ($ordered=~/y/i) {
+	    splice @{$marc->[$record]{array}},$insertorder,0,\@field;
+	}
+	else {
+	    push (@{$marc->[$record]{array}},\@field);
+	}
 	push (@{$marc->[$record]{$field}{field}},\@field);
 	push (@{$marc->[$record]{$field}{i1}{$i1}},\@field);
 	push (@{$marc->[$record]{$field}{i2}{$i2}},\@field);
@@ -1095,15 +1170,22 @@ This method will retrieve MARC field data from a specific record in the MARC obj
 
 =head2 deletemarc()
 
-This method will allow you to remove a specific record or a range of records from the MARC object. Note: putting single records in quotes is not necessary, but it is essential to put ranges in either single of double quotes so that they dont evaluate to a subtraction operation. You might want to use quotes on all values as below so you do not forget them when they are needed. deletemarc() will return the amount of records deleted.
+This method will allow you to remove a specific record, fields or subfields from a MARC object. Accepted parameters include: I<record>, I<field> and I<subfield>. Note: you can use the .. operator to delete a range of records. deletemarc() will return the amount of items deleted (be they records, fields or subfields). The I<record> parameter is optional. 
 
-    $x->deletemarc(['3']);
-    $y=$x->deletemarc(['4','21-50','60'});
-    print "$y records deleted!";
+        #delete all the records in the object
+    $x->deletemarc();
+        #delete records 1-5 and 7 
+    $x->deletemarc({record=>[1..5,7]});
+        #delete all of the 650 fields from all of the records
+    $x->deletemarc({field=>'650'});
+        #delete the 110 field in record 2
+    $x->deletemarc({record=>'2',field=>'110'});
+        #delete all of the subfield h's in the 245 fields
+    $x->deletemarc({field=>'245',subfield=>'h'});
 
 =head2 selectmarc()
 
-This method is the opposite of deletemarc() in that it will select specific records from a MARC object and remove the rest. You can specify both individual records and ranges of records in the same way as deletemarc(). selectmarc() will also return teh amount of records deleted. 
+This method will select specific records from a MARC object and delete the rest. You can specify both individual records and ranges of records in the same way as deletemarc(). selectmarc() will also return the amount of records deleted. 
 
     $x->selectmarc(['3']);
     $y=$x->selectmarc(['4','21-50','60']);
@@ -1149,7 +1231,7 @@ You can use this method to initialize a new record. It only takes one optional p
 
 =head2 addfield()
 
-This method will allow you to addfields to specified records. The syntax may look confusing at first, but once you understand it you will be able to add fields to records that you have read in, or to records that you have created with createrecord(). addfield() takes five parameters: I<record> which indicates the record number to add the field to, I<field> which indicates the field you wish to create (ie. 245), I<i1> which holds one character for the first indicator, I<i2> which holds one character for the second indicator, and I<value> which holds the subfield data that you wish to add to the field. Here are some examples:
+This method will allow you to addfields to a specified record. The syntax may look confusing at first, but once you understand it you will be able to add fields to records that you have read in, or to records that you have created with createrecord(). addfield() takes six parameters: I<record> which indicates the record number to add the field to, I<field> which indicates the field you wish to create (ie. 245), I<i1> which holds one character for the first indicator, I<i2> which holds one character for the second indicator, and I<value> which holds the subfield data that you wish to add to the field. addfield() will automatically try to insert your new field in tag order (ie. a 500 field before a 520 field), however you can turn this off if you set I<ordered> to "no" which will add the field to the end. Here are some examples:
 
     $y = $x->createrecord(); # $y will store the record number created
 
