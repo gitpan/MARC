@@ -41,13 +41,19 @@
     $x = MARC->new;
     $x->openmarc({file=>$infile,'format'=>"usmarc"}) || die;
 
+# You may want a more informative failure routine if run from a GUI
+
 # We process records one at a time for this operation. Multiple 852 fields
 # are legal (for multiple copies) - the 'h' subfield should be the same.
 # But a few percent of incoming materials do not include this subfield.
 
     while ($x->nextmarc(1)) {
         my ($callno) = $x->getvalue({record=>'1',field=>'852',subfield=>'h'});
-	$callno = "" unless (defined $callno);
+	$callno = "|" unless (defined $callno);
+
+# A single 'fill character' ("|" eq 0x7c) is used for none.
+# Some vendors don't like "empty" subfields
+
         $x->addfield({record=>1, 
                       field=>"999", 
                       ordered=>"n", 
@@ -67,7 +73,7 @@
 # have 9xx tags (e.g. 935), we want 'ordered' (which is also the default).
 
         $x->output({file=>">>$outfile",'format'=>"usmarc"});
-	unless ($callno) {
+	if ($callno eq "|") {
             $x->output({file=>">>$outtext",'format'=>"ascii",
 		lineterm=>"\r\n"});
 	    $missing++;

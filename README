@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.01, 05 December 1999
+VERSION=1.03, 17 January 2000
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -17,6 +17,8 @@ records, fields, indicators, and subfields can be created, modified, and
 deleted. It can extract URLs from the 856 field into HTML.
 
 The MARC::XML module adds conversions to and from XML.
+
+The MARC::Tie module adds another way to access this data.
 
 MARC.pm can handle both single and batches of MARC records. The limit on
 the number of records in a batch is determined by the memory capacity of
@@ -40,6 +42,7 @@ FILES:
     t/test1.t		- basic tests, search, update
     t/test2.t		- MARCMaker format tests
     t/test3.t		- Inheritance version of test1.t
+    t/test4.t		- tests for the *map* methods
     t/MARCopt.pm	- Inheritance stub module
     t/makrbrkr.mrc	- LoC. MARCMaker reference records
     t/makrtest.src	- MARCMaker source for makrbrkr.mrc
@@ -148,7 +151,7 @@ AUTHORS:
 
 COPYRIGHT
 
-Copyright (C) 1999, Bearden, Birthisel, Lane, McFadden, and Summers.
+Copyright (C) 2000, Bearden, Birthisel, Lane, McFadden, and Summers.
 All rights reserved. This module is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 Portions Copyright (C) 1999, Duke University, Lane.

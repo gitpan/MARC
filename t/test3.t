@@ -143,7 +143,7 @@ is_ok ($y1 eq $yy);						# 23
 my $rhldr = $x->unpack_ldr(1);
 is_ok('c' eq ${$rhldr}{RecStat});				# 24
 is_ok('a' eq ${$rhldr}{Type});					# 25
-is_ok('m' eq ${$rhldr}{BibLvl});				# 26
+is_ok('m' eq ${$rhldr}{BLvl});				        # 26
 
 my $rhff  = $x->unpack_008(1);
 is_ok('741021' eq ${$rhff}{Entered});				# 27

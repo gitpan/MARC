@@ -57,7 +57,7 @@ TEST4
 
 print DEFAULT <<'TEST4';	# single quotes - minimize chaacter quoting
 use Test::Harness;
-runtests ("t/test1.t","t/test2.t","t/test3.t");
+runtests ("t/test1.t","t/test2.t","t/test3.t","t/test4.t");
 
 print "\nTo run individual tests, type:\n";
 print "    C:\\> perl t/test?.t Page_Pause_Time (0..5)\n";

@@ -191,3 +191,23 @@ Revision history for Perl extension MARC.
 	- delete length() method and CORE::length() overrides
 	- add $TEST; replace carp with mycarp
 
+1.02u  Mon Dec 20 06:52:00 EST 1999 <Lane>
+	- added *map* series; supports a data-index view of marc.
+	- added deletefirst and updatefirst to support ties
+	- added getmatch and insertpos to support update or insert
+	   of subfields.
+	- added getfields/updatefields for fine-grained access to
+	   the {array} structures. Allows "in-place" update of fields.
+	- changed add_fields to use add_map. Let's subclasses have a
+	   policy of how they want their indices to look.
+	- changed _readmarc and _readmarcmaker to use add_map. Good
+	   for testing.
+	- Added simple tests for *first and *map* series as test4.t
+	   More complex and complete tests are in MARC::Tie.
+	- Added docs for *map*, getmatch,*fields*,getmatch and insertpos.
+
+1.03   Mon Jan 17 15:21:54 CST 2000 <Birthisel>
+	- Use fill char "|" for "none" in eg/addlocal.pl
+	- integrate "102u" changes into CPAN format
+	- fix bug in addfield where add_map not called if ($tag<10)
+

@@ -7,6 +7,7 @@ README.txt
 t/test1.t
 t/test2.t
 t/test3.t
+t/test4.t
 t/marc.dat
 t/badmarc.dat
 t/MARCopt.pm

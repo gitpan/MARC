@@ -1,11 +1,11 @@
 package MARC;
 
-require Carp;
+use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST
 	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
 	    );
-$VERSION = '1.01';
+$VERSION = '1.03';
 $DEBUG = 0;
 $TEST = 0;
 
@@ -22,9 +22,10 @@ require 5.004;
 #### Exporter::export_ok_tags('USTEXT');
 #### $EXPORT_TAGS{ALL} = \@EXPORT_OK;
 
-#gotta know where to find leader information....
+# gotta know where to find leader information....
 
-@LDR_FIELDS = qw(rec_len RecStat Type BibLvl Ctrl Undef base_addr EncLvl Desc ln_rec len_len_field len_start_char len_impl Undef2);
+@LDR_FIELDS = qw(rec_len RecStat Type BLvl Ctrl Undefldr base_addr
+		 ELvl Desc ln_rec len_len_field len_start_char len_impl Undef2ldr);
 
 $LDR_TEMPLATE = "a5aaaaa3a5aaaaaaa";
 
@@ -130,6 +131,7 @@ sub _readmarc {
     my $handle = $marc->[0]{'handle'};
     my $increment = $marc->[0]{'increment'}; #pick out increment from the object
     my $recordcount = 0;
+
     local $/ = "\035";	# cf. TPJ #14
     local $^W = 0;	# no warnings
     while (($increment==-1 || $recordcount<$increment) and my $line=<$handle>) {
@@ -150,40 +152,39 @@ sub _readmarc {
 	    return unless ($recordcount);	# undef if first
 	    return scalar (-$recordcount);	# if some are valid		
 	}
+
 	my @d = ();
-	my $record={};
-	$record->{"array"}=[];
+
 	$line=~/^(.{24})([^\036]*)\036(.*)/o;
 	my $leader=$1; my $dir=$2; my $data=$3;
-	push(@{$record->{'000'}},('000',$leader));
-	push(@{$record->{array}},$record->{'000'});
+	my $rnum = $marc->createrecord({leader=>"$leader"});
+	my $record = $marc->[-1];
+
 	@d=$dir=~/(.{12})/go;
 	for my $d(@d) {
 	    my @field=();
 	    my $tag=substr($d,0,3);
 	    chop(my $field=substr($data,substr($d,7,5),substr($d,3,4)));
 	    if ($tag<10) {
-		@field=("$tag","$field");
+		@field=($tag,$field);
 	    }
 	    else {
 		my ($indi1, $indi2, $field_data) = unpack ("a1a1a*", $field);
-		push (@field, "$tag", "$indi1", "$indi2");
+
+		push (@field, $tag, $indi1, $indi2);
+
 		my @subfields = split(/\037/,$field_data);
 		foreach (@subfields) {
 		    my $delim = substr($_,0,1);
 		    next unless $delim;
 		    my $subfield_data = substr($_,1);
-		    push(@field, "$delim", "$subfield_data");
-		    push(@{$record->{$tag}{$delim}}, \$subfield_data);
+		    push(@field, $delim, $subfield_data);
+
 		} #end parsing subfields
-		push(@{$record->{$tag}{i1}{$indi1}},\@field);
-		push(@{$record->{$tag}{i2}{$indi2}},\@field);
-		push(@{$record->{$tag}{i12}{"$indi1$indi2"}},\@field);
 	    } #end testing tag number
 	    push(@{$record->{'array'}},\@field);
-	    push(@{$record->{$tag}{field}},\@field);
+	    $marc -> add_map($rnum,\@field);
 	} #end processing this field
-	push(@$marc,$record);
 	$recordcount++;
     } #end processing this record
     return $recordcount;
@@ -203,6 +204,7 @@ sub _readmarcmaker {
     my $lineterm = $marc->[0]{'lineterm'} || "\015\012";
 	# MS-DOS file default for MARCMaker
     my $recordcount = 0;
+    binmode $handle;
       #Set the file input separator to "\r\n\r\n", which is the same as 
       #a blank line. A single blank line separates individual MARC records
       #in the MARCMakr format.
@@ -223,37 +225,45 @@ sub _readmarcmaker {
 	$leader=~s/\\/ /go;	# substitute " " for \
 	my $rnum = $marc->createrecord({leader=>"$leader"});
 	foreach my $line (@lines) {
-	       #Remove newlines from @fields ; and also substitute " " for \
+	    #Remove newlines from @fields ; and also substitute " " for \
 	    $line=~s/[\n\r]//og;
 	    $line=~s/\\/ /go;
-	      #get the tag name
+	    #get the tag name
 	    my $tag = substr($line,0,3);
-	      #if the tag is less than 010 (has no indicators or subfields)
-	      #then push the data into @$field
+	    my @field=(); #this will be added to $marc and the map updated.
+	    #if the tag is less than 010 (has no indicators or subfields)
+	    #then push the data into @$field
 	    if ($tag < 10) {
 		my $value = _maker2char (substr($line,5), $charset);
-		$marc->addfield({record=>"$rnum", field=>"$tag",
-				ordered=>"n", value=>[$value]});
+#		$marc->addfield({record=>"$rnum", field=>"$tag",
+#				ordered=>"n", value=>[$value]});
+		@field=($tag,$value);
 	    }
 	    else {
-		    #elseif the tag is greater than 010 (has indicators and 
-		    #subfields then add the data to the $marc object
-	        my @field=(); 
+		#elseif the tag is greater than 010 (has indicators and 
+		#subfields then add the data to the $marc object
 		my $field_data=substr($line,7);
+		my $i1=substr($line,5,1);
+		my $i2=substr($line,6,1);
+		@field = ($tag,$i1,$i2);
+
 		my @subfields=split /\$/, $field_data; #get the subfields
 		foreach my $subfield (@subfields) {
 		    my $delim=substr($subfield,0,1); #extract subfield delimiter
 		    next unless $delim;
 		    my $subfield_data= _maker2char (substr($subfield,1),
 						    $charset);
-			#extract subfield value
+		    #extract subfield value
 		    push (@field, $delim, $subfield_data);
 		} #end parsing subfields
-		$marc->addfield({record=>"$rnum", field=>"$tag",
-				i1=>substr($line,5,1), i2=>substr($line,6,1),
-				ordered=>"n", value=>\@field});
+
+#		$marc->addfield({record=>"$rnum", field=>"$tag",
+#				i1=>substr($line,5,1), i2=>substr($line,6,1),
+#				ordered=>"n", value=>\@field});
 	    } #end tag>10
-	    print "DEBUG: tag = $tag\n" if ($DEBUG);
+	    print "DEBUG: tag = $tag\n" if $DEBUG;
+	    push @{$marc->[$rnum]{'array'}},\@field;
+	    $marc -> add_map($rnum,\@field);
 	} #end reading this line
 	$recordcount++;
     } #end reading this record
@@ -422,7 +432,7 @@ sub closemarc {
     my $marc = shift;
     $marc->[0]{'increment'}=0;
     if (not($marc->[0]{'handle'})) {
-	mycarp "There isn't a MARC file to close";
+	mycarp "There isn't a MARC file to close"; 
 	return;
     }
     my $ok = close $marc->[0]{'handle'};
@@ -441,7 +451,7 @@ sub nextmarc {
     my $increment=shift;
     my $totalrecord;
     if (not($marc->[0]{'handle'})) {
-	mycarp "There isn't a MARC file open";
+	mycarp "There isn't a MARC file open"; 
 	return;
     }
     if ($increment) {$marc->[0]{'increment'}=$increment}
@@ -453,6 +463,81 @@ sub nextmarc {
     }
     else {return}   
     return $totalrecord;
+}
+
+####################################################################
+
+# add_map() takes a recnum and a ref to a field in ($tag,
+# $i1,$i2,a=>"bar",...) or ($tag, $field) formats and will append to
+# the various indices that we have hanging off that record.  It is
+# intended for use in creating records de novo and as a component for
+# rebuild_map(). It carefully does not copy subfield values or entire
+# fields, maintaining some reference relationships.  What this means
+# for indices created with add_map that you can directly edit
+# subfield values in $marc->[recnum]{array} and the index will adjust
+# automatically. Vice-versa, if you edit subfield values in
+# $marc->{recnum}{tag}{subfield_code} the fields in
+# $marc->[recnum]{array} will adjust. If you change structural
+# information in the array with such an index, you must rebuild the
+# part of the index related to the current tag (and possibly the old
+# tag if you change the tag).
+
+####################################################################
+
+sub add_map {
+    my $marc=shift;
+    my $recnum = shift;
+    my $rafield = shift;
+    my $tag = $rafield->[0];
+    return undef if $tag eq '000'; #currently handle ldr yourself...
+    my @tmp = @$rafield;
+    my $field_len = $#tmp;
+    my $record = $marc->[$recnum];
+    if ($tag > 10 ) {
+	my $i1 = $rafield->[1];
+	my $i2 = $rafield->[2];
+	my $i12 = $i1.$i2;
+
+	for(my $i=3;$i<$field_len;$i+=2) {
+	    my $subf_code = $rafield->[$i];
+	    push(@{$record->{$tag}{$subf_code}}, \$rafield->[$i+1]);
+	}
+	push(@{$record->{$tag}{'i1'}{$i1}},$rafield);
+	push(@{$record->{$tag}{'i2'}{$i2}},$rafield);
+	push(@{$record->{$tag}{'i12'}{$i12}},$rafield);
+    }
+    push(@{$record->{$tag}{field}},$rafield);
+}
+
+####################################################################
+
+# rebuild_map() takes a recnum and a tag and will synchronize the
+# index with all elements in the [recnum]{array} with that tag.
+
+####################################################################
+sub rebuild_map {
+    my $marc=shift;
+    my $recnum = shift;
+    my $tag = shift;
+    return undef if $tag eq '000'; #currently ldr is different...
+    my @tagrefs = grep {$_->[0] eq $tag} @{$marc->[$recnum]{'array'}};
+    delete $marc->[$recnum]{$tag};
+    for (@tagrefs) {$marc->add_map($recnum,$_)};
+}
+
+####################################################################
+
+# rebuild_map_all() takes a recnum and will synchronize the
+# index with all elements in the [recnum]{array}
+
+####################################################################
+sub rebuild_map_all {
+    my $marc=shift;
+    my $recnum = shift;
+
+    my %tags=();
+    map {$tags{$_->[0]}++} @{$marc->[$recnum]{'array'}};
+    foreach my $tag (keys %tags) {$marc->rebuild_map($recnum,$tag)};
 }
 
 ####################################################################
@@ -811,7 +896,7 @@ sub bib_format {
 sub _bib_format {
     my ($self,$ldr)=@_;
     my $rldr=$self->_unpack_ldr($ldr);
-    my ($type,$bib_lvl) = ($rldr->{Type},$rldr->{BibLvl});
+    my ($type,$bib_lvl) = ($rldr->{Type},$rldr->{BLvl});
     return "UNKNOWN (Type $type Bib_Lvl $bib_lvl)" unless ($type=~/[abcdefgijkmprot]/ &&
 							   (($bib_lvl eq "") or 
 							    $bib_lvl=~/[abcdms]/)
@@ -892,6 +977,7 @@ sub pack_008 {
 
     $self->deletemarc($u008);
     $self->addfield($u008, ($ff_string));
+
     return $ff_string;
 }
 
@@ -997,10 +1083,6 @@ sub output {
     }
     elsif ($args->{'format'} =~ /xml/oi) {
 	mycarp "XML formats are now handled by MARC::XML" if ($^W);
-	return;
-    }
-    elsif ($args->{'format'}) {
-	mycarp "Unrecognized format specified for output" if ($^W);
 	return;
     }
     if ($args->{file}) {
@@ -1334,6 +1416,7 @@ sub _marc2html {
     return $output;
 }
 
+
 ####################################################################
 # _urls() takes a MARC object as its input, and then extracts the  #
 # control# (MARC 001) and URLs (MARC 856) and outputs them as      #
@@ -1502,7 +1585,7 @@ sub addfield {
 	else {
 	    push (@{$marc->[$record]{array}},\@field);
 	}
-	push (@{$marc->[$record]{$field}{field}},\@field); 
+#	push (@{$marc->[$record]{$field}{field}},\@field); 
     }
     else {
 	push (@field, $field, $i1, $i2);
@@ -1511,7 +1594,7 @@ sub addfield {
 	    last if ($sub_id eq "\036");
 	    $subfield = shift @value;
 	    push (@field, $sub_id, $subfield);
-	    push (@{$marc->[$record]{$field}{$sub_id}}, \$field[$#field]);
+#	    push (@{$marc->[$record]{$field}{$sub_id}}, \$field[$#field]);
 	}
 	if ($ordered=~/y/i) {
 	    splice @{$marc->[$record]{array}},$insertorder,0,\@field;
@@ -1519,11 +1602,31 @@ sub addfield {
 	else {
 	    push (@{$marc->[$record]{array}},\@field);
 	}
-	push (@{$marc->[$record]{$field}{field}},\@field);
-	push (@{$marc->[$record]{$field}{i1}{$i1}},\@field);
-	push (@{$marc->[$record]{$field}{i2}{$i2}},\@field);
-	push (@{$marc->[$record]{$field}{i12}{"$i1$i2"}},\@field);
+#	push (@{$marc->[$record]{$field}{field}},\@field);
+#	push (@{$marc->[$record]{$field}{i1}{$i1}},\@field);
+#	push (@{$marc->[$record]{$field}{i2}{$i2}},\@field);
+#	push (@{$marc->[$record]{$field}{i12}{"$i1$i2"}},\@field);
     }
+    $marc->add_map($record,\@field);
+}
+
+####################################################################
+
+# getfields() takes a template and returns an array of fieldrefs from
+# $marc->[$recnum]{'array'} with the appropriate tag.
+
+####################################################################
+sub getfields {
+    my @output;
+    my $marc=shift;
+    my $params=shift;
+    my $record=$params->{record};
+    unless ($record) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
+    my $field = $params->{field};
+    unless ($field) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
+    return grep { $_->[0] eq $field }   @{$marc->[$record]{'array'}};
 }
 
 ####################################################################
@@ -1567,6 +1670,355 @@ sub getupdate {
     }
     return @output;
 }
+#################################################################### 
+
+# deletefirst() takes a template and a boolean $do_rebuild_map to
+# rebuild the map. It deletes the field data for a first match, using
+# the template and leaves the rest alone. If the template has a
+# subfield element it deletes based on the subfield information in the
+# template. If the last subfield of a field is deleted, deletefirst()
+# also deletes the field.  It complains about attempts to delete
+# indicators.  If there is no match, it does nothing. Deletefirst also
+# rebuilds the map if $do_rebuild_map. Deletefirst returns the number
+# of matches deleted (that would be 0 or 1), or undef if it feels
+# grumpy (i.e. carps).
+
+####################################################################
+
+sub deletefirst {
+    my $marc = shift || return;
+    my $template = shift;
+    return unless (ref($template) eq "HASH");
+    return if (defined $template->{value});
+
+    my $field = $template->{field};
+    my $recnum = $template->{record};
+    my $subfield = $template->{subfield};
+    my $do_rebuild_map = $template->{rebuild_map};
+    if (!$recnum) {mycarp "Need a record to confine my destructive tendencies"; return undef}
+    if (defined($subfield) and $subfield =~/^i[12]$/) {mycarp "Cannot delete indicators"; return undef}
+#I know that $marc->[$recnum]{$field}{field} is this information
+#But I don't want to depend on the map being up-to-date allways.
+    my @fieldrefs = grep {$_->[0] eq $field} @{$marc->[$recnum]{'array'}};
+
+    return 0 unless scalar(@fieldrefs);
+    
+    if ($field and not($subfield)) {
+	shift @fieldrefs;
+	$marc->updatefields($template,\@fieldrefs);
+	$marc->rebuild_map($recnum,$field) if $do_rebuild_map;
+	return 1;
+    }
+
+
+    #Linear search for the field where deletion happens and the position 
+    #in that field.
+    my $rvictim=0;
+    my $fieldnum = 0;
+    foreach my $fieldref (@fieldrefs) {
+	if ($marc->getmatch($subfield,$fieldref)){
+	    $rvictim=$fieldref;
+	    last;
+	}
+	$fieldnum++;
+    }
+    if (!$rvictim) {
+	$marc->rebuild_map($recnum,$field) if $do_rebuild_map;
+	return 0;
+    }
+
+    #Now we know that we have a field and subfield with a match.
+    #Find the first one and kill it. Kill the enclosing field 
+    #if it is the last one.
+    $marc->deletesubfield($subfield,$rvictim);
+    $marc->field_updatehook($rvictim);
+    if ($marc->field_is_empty($rvictim)) {
+	splice @fieldrefs,$fieldnum,1;
+	$marc->updatefields($template,\@fieldrefs);
+    }
+    #here we don't need to directly touch $marc->[$recnum]{array}
+    # since we are not changing its structure.
+    $marc->rebuild_map($recnum,$field) if $do_rebuild_map;
+    return 1;
+}
+
+#################################################################### 
+
+# field_is_empty takes a ref to an array formatted like
+# an element of $marc->[$recnum]{array}. It returns 1 if there are
+# no "significant" elements of the array (e.g. nothing but indicators
+# if $tag>10), else 0. Override this if you want to delete fields
+# that have "insignificant" subfields inside deletefirst.
+
+####################################################################
+sub field_is_empty {
+    my ($marc,$rfield) = @_;
+    my $tag = $rfield->[0];
+    my @field = @$rfield;
+    return 1 if ($tag > 10 and !defined($field[3]));
+    return 1 if ($tag < 10 and !defined($field[1]) );
+    return 0;
+}
+
+#################################################################### 
+
+# field_updatehook takes a ref to an array formatted like
+# $marc->[$recnum]{'array'}. It is there so that
+# subclasses can override it to do something before calling
+# addfield(), e.g.  store field-specific information in the affected
+# field or log information in an external file/database. One notes that
+# since this is a method, it can ignore its arguments and log global
+# information about $marc, e.g. order information in $marc->[$rnum]{'array'}
+
+####################################################################
+
+sub field_updatehook {
+    my ($marc,$rfield)=@_;
+    #Do nothing. subclasses problem.
+}
+
+#################################################################### 
+
+# updatefirst() takes a template, a request to rebuild the index, and
+# an array from $marc->[recnum]{array}. It replaces/creates the field
+# data for a first match, using the template, and leaves the rest
+# alone. If the template has a subfield element, (this includes
+# indicators) it ignores all other information in the array and only
+# updates/creates based on the subfield information in the array. If
+# the template has no subfield information then indicators are left
+# untouched unless a new field needs to be created, in which case they
+# are left blank.
+
+####################################################################
+
+sub updatefirst {
+    my $marc = shift || return;
+    my $template = shift;
+    return unless (ref($template) eq "HASH");
+    return unless (@_);
+    return if (defined $template->{value});
+
+
+    my @ufield = @_;
+    my $field = $template->{field};
+    my $recnum = $template->{record};
+    my $subfield = $template->{subfield};
+    my $do_rebuild_map = $template->{rebuild_map};
+
+    $ufield[0]= $field;
+    my $ufield_lt_10_value = $ufield[1];
+    my $ftemplate = {record=>$recnum,field=>$field};
+    if (!$recnum) {mycarp "Need a record to confine my changing needs."; return undef}
+    if (!$field) {mycarp "Need a field to configure my changing needs."; return undef}
+
+    my @fieldrefs = grep {$_->[0] eq $field} @{$marc->[$recnum]{'array'}};
+
+# An invariant is that at most one element of @fieldrefs is affected.
+    if ($field and not($subfield)) {
+	#save the indicators! Yes! Yes!
+	my ($i1,$i2) = (" "," ");
+	if (defined($fieldrefs[0])) {
+	    $i1 = $fieldrefs[0][1];
+	    $i2 = $fieldrefs[0][2];
+	}
+	$ufield[1]=$i1; 
+	$ufield[2]=$i2;
+	if ($field <10) {@ufield = ($field,$ufield_lt_10_value)}
+	my $rafieldrefs;
+	$rafieldrefs->[0] = \@ufield;
+	if (!scalar(@fieldrefs)) {
+	    $marc->updatefields($template,$rafieldrefs);		
+	    return;
+	}
+	$fieldrefs[0]=\@ufield;
+#There may be an issue with $fieldrefs being taken over by the splice in updatefields.
+	$marc->updatefields($template,\@fieldrefs);
+	return;
+#	my @newfield = $marc->upd_flatten(@fieldrefs);
+#	return $marc->addfield($ftemplate,@newfield) unless scalar(@fieldinfo);
+#	return $marc->updaterecord($ftemplate,@newfield);
+    } #end field.
+# The case of adding first subfields is hard.  (Not too bad with
+# indicators since every non-control field has them.)
+# OK, we have recnum, field, and subfield. 
+	if ($field and $subfield) {
+	    if ($field <10) {croak "Cannot update subfields of control fields"; return undef}
+
+	    my $rvictim=0;
+	    my $fieldnum = 0;
+	    my $rval = 0;
+	    foreach my $fieldref (@fieldrefs) {
+		$rval = $marc->getmatch($subfield,$fieldref);
+		if ($rval){
+		    $rvictim=$fieldref;
+		    last;
+		}
+		$fieldnum++;
+	    }
+# At this stage we have the number of the field $fieldnum, 
+# whether there is a match, $rvictim,
+# and what to update if there is, $rval.
+
+	    if (!$rvictim and $subfield =~/^i[12]$/) {
+		mycarp "Field $field does not exist. Can only add indicator $subfield to existing fields.";
+		return undef;
+	    }
+	    #Now we need to find first match in @ufield.
+	    my $usub = undef;
+	    $usub=$ufield[1] if $subfield eq 'i1';
+	    $usub=$ufield[2] if $subfield eq 'i2';
+
+	    for(my  $i=3;$i<@ufield;$i = $i+2) {
+		my $sub = $ufield[$i]; 
+		if ($sub eq $subfield) {
+		    $usub = $ufield[$i+1];
+		    last;
+		}
+	    }
+	    mycarp(
+		 "Did not find $subfield in spec (".
+		 join " ",@ufield . ")" 
+		 ) if !defined($usub);
+
+	    if (!scalar(@fieldrefs)) {
+		my @newfield = ($field, ' ',' ', $subfield =>$usub);
+		my $rafields;
+		$rafields->[0] = \@newfield;
+		return $marc->updatefields($template,$rafields);
+	    }
+	    #The general insert case.
+	    if (!$rvictim and scalar(@fieldrefs)) {
+		$rvictim = $fieldrefs[0];
+		$marc->insertpos($subfield,$usub,$rvictim);
+		$marc->field_updatehook($rvictim);
+		$marc->rebuild_map($recnum,$field) if $do_rebuild_map;
+		return 1; # $rvictim is now defined, so can't depend on future
+		          # control logic. 
+	    }
+	    #The general replace case.
+	    if ($rvictim) {
+		$$rval = $usub;
+		$marc->field_updatehook($rvictim);
+
+		# The following line is unecessary for this class:
+		# everything updates due to hard-coded ref
+		# relationships in the index.  Left so that subclasses
+		# can do their thing with less over-ruling.
+
+		$marc->rebuild_map($recnum,$field) if $do_rebuild_map; 
+		return 1;
+		}
+	} #end $field and $subfield
+}
+
+####################################################################
+
+# updatefields() takes a template which specifies recnum, a
+# $do_rebuild_map and a field (needs the field in case $rafields->[0]
+# is empty). It also takes a ref to an array of fieldrefs formatted
+# like the output of getfields(), and replaces/creates the field
+# data. It assumes that it should remove the fields with the first tag
+# in the fieldrefs and assumes that fields with that tag are
+# contiguous. It calls rebuild_map() if $do_rebuild_map.
+
+####################################################################
+sub updatefields {
+    my $marc = shift || return;
+    my $template = shift;
+    my $recnum = $template->{record};
+    my $do_rebuild_map = $template->{rebuild_map};
+    my $tag = $template->{field};
+    my $rafieldrefs = shift;
+    my @fieldrefs = @$rafieldrefs;
+
+
+    my $pos = 0;
+    my $start=-1;
+    my $firstpast =-1;
+    my $len = 0;
+    my @mfields = @{$marc->[$recnum]{'array'}};
+    my $insertpos = undef;
+    for (@mfields) {
+	$start = $pos if ($_->[0] eq $tag and  $start == -1);
+	$len++ if ($_->[0] eq $tag);
+	$firstpast  = $pos if ($_->[0] >= $tag and  $firstpast == -1);
+	$pos++;
+    }
+    $insertpos = scalar(@mfields) if $firstpast == -1;
+    $insertpos = $start if ($start != -1);
+    $insertpos = $firstpast unless $insertpos;
+    splice @{$marc->[$recnum]{'array'}},$insertpos,$len,@fieldrefs;
+    $marc->rebuild_map($recnum,$tag) if $do_rebuild_map;
+}
+
+####################################################################
+
+# getmatch() takes a subfield code (can be an indicator) and a fieldref
+# Returns 0 or a ref to the value to be updated.
+
+####################################################################
+sub getmatch {
+    my $marc = shift || return;
+    my $subf = shift;
+    my $rfield = shift;
+    my $tag = $rfield->[0];
+    if ($tag < 10) {mycarp "can't find subfields or indicators for control fields"; return undef}
+    return \$rfield->[1] if $subf eq 'i1';
+    return \$rfield->[2] if $subf eq 'i2';
+
+    for (my $i=3;$i<@$rfield;$i+=2) {
+	return \$rfield->[$i+1] if $rfield->[$i] eq $subf;
+    }
+    return 0;
+}
+####################################################################
+
+# deletesubfield() takes a subfield code (can not be an indicator) and a
+# fieldref. Deletes the subfield code and its value in the fieldref at
+# the first match on subfield code.  Assumes there is an exact
+# subfield match in $fieldref.
+
+####################################################################
+sub deletesubfield {
+    my $marc = shift || return;
+    my $subf = shift;
+    my $rfield = shift;
+    my $tag = $rfield->[0];
+    if ($tag < 10) {mycarp "Can't use subfields or indicators for control fields"; return undef}
+
+    if ($subf =~/i[12]/) {mycarp "Can't delete an indicator."; return undef}
+    my $i=3;
+    for ($i=3;$i<@$rfield;$i+=2) {
+	last if $rfield->[$i] eq $subf;
+    }
+    splice @$rfield,$i,2; 
+    
+}
+
+####################################################################
+
+# insertpos() takes a subfield code (can not be an indicator), a
+# value, and a fieldref. Updates the fieldref with the first
+# place that the fieldref can match. Assumes there is no exact
+# subfield match in $fieldref.
+
+####################################################################
+sub insertpos {
+    my $marc = shift || return;
+    my $subf = shift;
+    my $value = shift;
+    my $rfield = shift;
+    my $tag = $rfield->[0];
+    if ($tag < 10) {mycarp "Can't use subfields or indicators for control fields"; return undef}
+
+    if ($subf =~/i[12]/) {mycarp "Can't insert past an indicator."; return undef}
+    my $i=3;
+    for ($i=3;$i<@$rfield;$i+=2) {
+	last if $rfield->[$i] gt $subf;
+    }
+    splice @$rfield,$i,0,$subf,$value;
+}
+    
 
 ####################################################################
 # updaterecord() takes an array of key/value pairs, formatted like #
@@ -1918,6 +2370,63 @@ If you are finished reading in records from a file you should close it immediate
 
     $x->closemarc();
 
+=head2 add_map()
+
+add_map() takes a recnum and a ref to a field in ($tag,
+$i1,$i2,a=>"bar",...) or ($tag, $field) formats and will append to the
+various indices that we have hanging off that record.  It is intended
+for use in creating records de novo and as a component for
+rebuild_map(). It carefully does not copy subfield values or entire
+fields, maintaining some reference relationships.  What this means for
+indices created with add_map that you can directly edit subfield
+values in $marc->[recnum]{array} and the index will adjust
+automatically. Vice-versa, if you edit subfield values in
+$marc->{recnum}{tag}{subfield_code} the fields in
+$marc->[recnum]{array} will adjust. If you change structural
+information in the array with such an index, you must rebuild the part
+of the index related to the current tag (and possibly the old tag if
+you change the tag).
+
+   use MARC 1.02;
+   while (<>) {
+        chomp;
+        my ($author,$title) = split(/\t/);
+        $rnum = $x->createrecord({leader=>
+			    	       "00000nmm  2200000 a 4500"});
+
+        my @auth = (100, ' ', ' ', a=>$author);
+        my @title = (245, ' ', ' ', a=>$title);
+        push @{$x->[$rnum]{array}}, \@auth;
+        $x->add_map($rnum,\@auth);
+        push @{$x->[$rnum]{array}}, \@title;
+        $x->add_map($rnum,\@title);
+   }
+
+=head2 rebuild_map
+
+rebuild_map takes a recnum and a tag and will synchronise the index with
+the array elements of the marc record at the recnum with that tag.
+
+      #Gonna change all 099's to 092's since this is a music collection.
+      grep {$->[0] =~s/099/092} @{$x->[$recnum]{array}};
+      
+      #Oops, now the index is out of date on the 099's...
+      $x->rebuild_map($recnum,099);
+      #... and the 092's since we now have new ones.
+      $x->rebuild_map($recnum,092);
+      #All fixed.
+
+=head2 rebuild_map_all
+
+rebuild_map takes a recnum and will synchronise the index with
+the array elements of the marc record at the recnum.
+
+=head2 getfields
+
+getfields takes a template and returns an array of fieldrefs with the
+tag and record number implied by that template. The fields referred are 
+fields from the $marc->[$recnum]{array} group.
+
 =head2 marc_count()
 
 Returns the total number of records in a MARC object. This method was
@@ -2017,6 +2526,20 @@ ldr based on any existing hash version.
 	    # New value is in the 008 field of $record'th marc
       }
 
+=head2 deletefirst()
+
+deletefirst() takes a template. It deletes the field data for a first
+match, using the template and leaves the rest alone. If the template
+has a subfield element it deletes based on the subfield information in
+the template. If the last subfield of a field is deleted,
+deletefirst() also deletes the field.  It complains about attempts to
+delete indicators.  If there is no match, it does nothing. Deletefirst
+also rebuilds the map if the template asks for that
+$do_rebuild_map. Deletefirst returns the number of matches deleted
+(that would be 0 or 1), or undef if it feels grumpy (i.e. carps).
+
+Most use of deletefirst is expected to be by MARC::Tie.
+
 =head2 deletemarc()
 
 This method will allow you to remove a specific record, fields or subfields from a MARC object. Accepted parameters include: I<record>, I<field> and I<subfield>. Note: you can use the .. operator to delete a range of records. deletemarc() will return the number of items deleted (be they records, fields or subfields). The I<record> parameter is optional. It defaults to all user records [1..$#marc] if not specified.
@@ -2035,6 +2558,68 @@ This method will allow you to remove a specific record, fields or subfields from
 
         #delete all of the subfield h's in the 245 fields
     $x->deletemarc({field=>'245',subfield=>'h'});
+
+=head2 updatefirst()
+
+updatefirst() takes a template, and an array from
+$marc->[recnum]{array}. It replaces/creates the field data for a first
+match, using the template and the array, and leaves the rest alone. If
+the template has a subfield element, (this includes indicators) it
+ignores all other information in the array and only updates/creates
+based on the subfield information in the array. If the template has no
+subfield information then indicators are left untouched unless a new
+field needs to be created, in which case they are left blank.
+
+Most use of updatefirst() is expected to be from MARC::Tie.
+It does not currently provide a useful return value.
+
+=head2 updatefields()
+
+updatefields() takes a template which specifies recnum, a
+$do_rebuild_map and a field (needs the field in case $rafields->[0] is
+empty). It also takes a ref to an array of fieldrefs formatted like
+the output of getfields(), and replaces/creates the field data. It
+assumes that it should remove the fields with the first tag in the
+fieldrefs and assumes that fields with that tag are contiguous. It
+calls rebuild_map() if $do_rebuild_map.
+
+    #Let's kill the *last* 500 field.
+    my $loc500 = {record=>1,field=>500,rebuild_map=>1};
+    my @rfields = $x->getfields($loc500);
+    pop @rfields;
+    $x->updatefields($loc500,\@rfields);
+
+=head2 getmatch()
+
+getmatch() takes a subfield code (can be an indicator) and a fieldref.
+Returns 0 or a ref to the value to be updated.
+    
+    #Let's update the value of i2 for the *last* 500
+    my $loc500 = {record=>1,field=>500,rebuild_map=>1};
+    my @rfields = $x->getfields($loc500);
+    my $rvictim = pop @rfields;
+    my $rval = getmatch('i2',$rvictim);
+    $$rval = "4" if $rval;
+
+=head2 insertpos()
+
+insertpos() takes a subfield code (can not be an indicator), a value,
+and a fieldref. Updates the fieldref with the first place that the
+fieldref can match. Assumes there is no exact subfield match in
+$fieldref.
+
+    #Let's update the value of subfield 'a' for the *last* 500
+    my $value = "new info";
+    my $loc500 = {record=>1,field=>500,rebuild_map=>1};
+    my @rfields = $x->getfields($loc500);
+    my $rvictim = pop @rfields;
+    my $rval = getmatch('a',$rvictim);
+    if ($rval) {
+        $$rval = $value ;
+    } else {
+	$x->insertpos('a',$value,$rvictim);
+    }
+
 
 =head2 selectmarc()
 
@@ -2376,9 +2961,9 @@ perl(1), http://lcweb.loc.gov/marc
 
 =head1 COPYRIGHT
 
-Copyright (C) 1999, Bearden, Birthisel, Lane, McFadden, and Summers.
+Copyright (C) 2000, Bearden, Birthisel, Lane, McFadden, and Summers.
 All rights reserved. This module is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself. 22 November 1999.
+it and/or modify it under the same terms as Perl itself. 17 January 2000.
 Portions Copyright (C) 1999, Duke University, Lane.
 
 =cut
