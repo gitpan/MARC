@@ -4,7 +4,7 @@
 # `make test'. After `make install' it should work as `perl test1.t'
 
 use lib '.','./t';	# for inheritance and Win32 test
-#### use lib './blib/lib','../blib/lib','./lib','../lib','..';
+## use lib './blib/lib','../blib/lib','./lib','../lib','..';
 # can run from here or distribution base
 
 ######################### We start with some black magic to print on failure.
@@ -99,6 +99,7 @@ unless (is_ok ($x = MARC->new($file3,"marcmaker"))) {		# 2
     # next test would die at runtime without $x
 }
 
+$MARC::TEST = 1; # so outputs have known dates for 005
 is_ok (8 == $x->marc_count);					# 3
 
    #Output the MARC object to a marcmaker file with nolinebreak
@@ -121,10 +122,11 @@ is_ok ($x->output({file=>">output.mkr",'format'=>"marc"}));	# 9
 
 out_cmp ("output.mkr", $file);					# 10
 
+$MARC::TEST = 0; #minimal impact
 $^W = 0;
 my ($m000) = $x->getvalue({record=>'1',field=>'000'});
 my ($m001) = $x->getvalue({record=>'1',field=>'001'});
-is_ok ($m000 eq "01201nam  2200253 a 4500");			# 11
+is_ok ($m000 eq "01200nam  2200253 a 4500");			# 11
 is_ok ($m001 eq "tes96000001 ");				# 12
 
 my ($m002) = $x->getvalue({record=>'1',field=>'002'});
@@ -135,7 +137,7 @@ is_ok ($m003 eq "ViArRB");					# 14
 my ($m004) = $x->getvalue({record=>'1',field=>'004'});
 my ($m005) = $x->getvalue({record=>'1',field=>'005'});
 is_bad (defined $m004);						# 15
-is_ok ($m005 eq "199602210153555.7");				# 16
+is_ok ($m005 eq "19960221075055.7");				# 16
 
 my ($m006) = $x->getvalue({record=>'1',field=>'006'});
 my ($m007) = $x->getvalue({record=>'1',field=>'007'});

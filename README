@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.04, 24 January 2000
+VERSION=1.05, 31 January 2000
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -126,6 +126,10 @@ writes. The usmarc/ustext character maps are used by default, so existing
 files in that format will produce different results than earlier versions.
 
 Starting with version 1.00, the XML conversions are moved to MARC::XML.
+
+Version 1.05 no longer assumes fields with same tag are contiguous. This
+is required for CJK characters and may introduce other changes from earlier
+conversions.
 
 NOTES:
 

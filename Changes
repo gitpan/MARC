@@ -198,7 +198,7 @@ Revision history for Perl extension MARC.
 	   of subfields.
 	- added getfields/updatefields for fine-grained access to
 	   the {array} structures. Allows "in-place" update of fields.
-	- changed add_fields to use add_map. Let's subclasses have a
+	- changed add_fields to use add_map. Lets subclasses have a
 	   policy of how they want their indices to look.
 	- changed _readmarc and _readmarcmaker to use add_map. Good
 	   for testing.
@@ -212,8 +212,29 @@ Revision history for Perl extension MARC.
 	- fix bug in addfield where add_map not called if ($tag<10)
 
 1.04   Mon Jan 24 22:31:26 CST 2000 <Birthisel>
-	- opps, had to fix the Win32 5.00402 binmode again (c.f 0.98)
+	- oops, had to fix the Win32 5.00402 binmode again (c.f 0.98)
 	- added quotes to 'rebuild_map' used as hash key (5.004 warnings)
 	- add docs for "keys" in hash returned by 'unpack_ldr'
 	- add xml format error messages
 
+1.05   Sat Jan 29 22:59:03 EST 2000 <Lane>
+	- Removed unnecessary quotes in various potentially tainted variables.
+	- Removed bad references to FF_* in docs.
+	- Updatefields() no longer assumes that fields with the same tag are 
+	  contiguous (e.g. cjk).
+	- Getfields() no longer assumes that fields with the same tag are 
+	  contiguous (again, cjk).
+	- Docs updated to reflect the relaxed assumption.
+	- Extensive quoting of keys for a more warning-free experience.
+	
+	Sun Jan 30 14:34:02 EST 2000 <Lane>
+	- Created add_005s(), _make_005().
+	- Inserted add_005s into output so now we are correctly datestamped.
+	- Docs added for 005 functionality.
+	
+	Mon Jan 31 12:55:52 EST 2000 <Lane>
+	- Fixed $args->{'record'} complaint if $args does not exist.
+	- Now we return "19960221075055.7" when in $TEST mode for 005.
+	- Fixed and updated test2.t and test files makrbrkr.mrc and makrtest.src.
+	  (now have all canonical 005's; makrtest had a 17 digit time, not 16 in the
+	  first record).
