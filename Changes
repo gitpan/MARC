@@ -319,4 +319,6 @@ Revision history for Perl extension MARC.
 	  Fixed some speling erorrs.
 	- Removed test numbers from the test*t's. Diffs will be clearer in the future.
 	  Use b is_ok $tc=nn in the debugger instead.
-	
+
+1.13   Wed Apr 18 18:52:46 EDT 2001 <Summers>
+  - Made changes to _marc2html to bring back support for named fields (Chuck Bearden)

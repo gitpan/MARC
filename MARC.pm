@@ -4,7 +4,7 @@ use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST);
 
-$VERSION = '1.12';
+$VERSION = '1.13';
 $MARC::DEBUG = 0;
 $MARC::TEST = 0;
 
@@ -1843,7 +1843,8 @@ sub _marc2html { # rec
 
     my %tags =();
 
-    %tags = map {$_=>1} @tags;
+    # store labels, if given, in %tags hash, in lieu of int 1; CB 4/18/2001
+    %tags = map {$_=> $args->{$_} || 1} @tags;
     %tags = map {$_->[0]=>1} @{$marcrec->{'array'}} if $outputall;
       #if 'all' fields are specified then set $outputall flag to yes
     local $^W = 0;	# no warnings
@@ -1852,8 +1853,12 @@ sub _marc2html { # rec
     $output.= $newline."<p>";
     
     foreach my $rfield (@{$j->{'array'}}) {
-	$output.= $rfield->[0]." ".$j->_joinfield($rfield,$rfield->[0])."<br>".$newline
-	    if $tags{$rfield->[0]};
+       if ($tags{$rfield->[0]}) {
+               $output .= ($args->{$rfield->[0]} == 1) ?
+                 $rfield->[0] :
+                 $args->{$rfield->[0]};
+               $output.= " ".$j->_joinfield($rfield,$rfield->[0])."<br>".$newline;
+       }
     }
     $output.="</p>";
     return $output;
