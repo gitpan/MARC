@@ -2,12 +2,11 @@ package MARC;
 
 use Carp;
 use strict;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST
-	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
-	    );
-$VERSION = '1.05';
-$DEBUG = 0;
-$TEST = 0;
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST);
+
+$VERSION = '1.07';
+$MARC::DEBUG = 0;
+$MARC::TEST = 0;
 
 require Exporter;
 require 5.004;
@@ -22,52 +21,11 @@ require 5.004;
 #### Exporter::export_ok_tags('USTEXT');
 #### $EXPORT_TAGS{ALL} = \@EXPORT_OK;
 
-# gotta know where to find leader information....
-
-@LDR_FIELDS = qw(rec_len RecStat Type BLvl Ctrl Undefldr base_addr
-		 ELvl Desc ln_rec len_len_field len_start_char len_impl Undef2ldr);
-
-$LDR_TEMPLATE = "a5aaaaa3a5aaaaaaa";
-
-#...And the 008 field has a special place in Librarians' hearts.
-%FF_FIELDS = (
-	      BOOKS =>
-	      [qw(Entered DtSt Date1 Date2 Ctry Ills Audn Form Cont
-		  GPub Conf Fest Indx Undef1 Fict Biog Lang MRec Srce)],
-	      COMPUTER_FILES => 
-	      [qw(Entered DtSt Date1 Date2 Ctry Undef1 Audn Undef2 
-		  File Undef3 GPub Undef4 Lang MRec Srce)],
-	      MAPS =>
-	      [qw(Entered DtSt Date1 Date2 Ctry Relf Proj Prme CrTp
-		  Undef1 GPub Undef2 Indx Undef3 SpFm Lang MRec Srce)],
-	      MUSIC =>        
-	      [qw(Entered DtSt Date1 Date2 Ctry Comp FMus Undef1 Audn
-		  Form AccM LTxt Undef2 Lang MRec Srce)],
-	      SERIALS =>	
-	      [qw(Entered DtSt Date1 Date2 Ctry Freq Regl ISSN SrTp
-		  Orig Form EntW Cont GPub Conf Undef1 Alph S_L Lang MRec Srce)],
-	      VIS =>
-	      [qw(Entered DtSt Date1 Date2 Ctry Time Undef1 
-		  Audn AccM GPub Undef2 TMat Tech Lang MRec Srce)],
-	      MIX =>
-	      [qw(Entered DtSt Date1 Date2 
-		  Ctry Undef1 Form Undef2 Lang MRec Srce)]
-	      );
-
-%FF_TEMPLATE = (
-		BOOKS          =>   "a6a1a4a4a3a4a1a1a4a1a1a1a1a1a1a1a3a1a1",
-		COMPUTER_FILES =>   "a6a1a4a4a3a4a1a3a1a1a1a6a3a1a1",
-		MAPS           =>   "a6a1a4a4a3a4a2a1a1a2a1a2a1a1a2a3a1a1",
-		MUSIC          =>   "a6a1a4a4a3a2a1a1a1a1a6a2a3a3a1a1",
-		SERIALS        =>   "a6a1a4a4a3a1a1a1a1a1a1a1a3a1a1a3a1a1a3a1a1",
-		VIS            =>   "a6a1a4a4a3a3a1a1a5a1a4a1a1a3a1a1",
-		MIX            =>   "a6a1a4a4a3a5a1a11a3a1a1"
-		);
 
 # Preloaded methods go here.
 
-sub mycarp {
-    Carp::carp (@_) unless $TEST;
+sub mycarp { # rec
+    Carp::carp (@_) unless $MARC::TEST;
 }
 
 ####################################################################
@@ -75,13 +33,35 @@ sub mycarp {
 # will call the appropriate read using the file and format         #
 # parameters that are passed.                                      #
 ####################################################################
-sub new {
+sub new { # rec
     my $proto = shift;
     my $class = ref($proto) || $proto;
     my $file = shift;
     my $marc = []; 
     my $totalrecord;
     $marc->[0]{'increment'}=-1; #store the default increment in the object
+    my $proto_rec;
+#    print STDERR "foo\n";
+    { 
+	# We are going to look for related classes in Perl's
+	# symbol table. This is a little tricky.
+	# Shoot me.
+	
+	no strict 'refs';
+	# Next, we set up a symbolic reference.
+	my $g = $ {$class.'::Rec::VERSION'}; # space for emacs.
+	# That was a sample of Perl reflection. Yup, what Smalltalk
+	# does with Class and MetaClass, Perl does with strings.
+	# Not much structure, but also not much fuss.
+
+        my $rec_class = $class."::Rec" if $g;
+	# Now we will use the related Rec class if it exists.
+        $rec_class ||= "MARC::Rec";
+    
+	$proto_rec = $rec_class->new();
+    }
+
+    $marc->[0]{'proto_rec'}=$proto_rec; # Used for future manipulations.
     bless ($marc, $class);
 	# bless early so _readxxx can use methods
         #if file isn't defined then just return the empty MARC object
@@ -90,26 +70,22 @@ sub new {
 	    #if the file doesn't exist return an error
         my $format = shift || "usmarc";
 	    # $format defaults to USMARC if undefined
+	open(*file, $file) or mycarp "Open Error: $file, $!";
+	binmode *file;
+	$marc->[0]{'handle'}=\*file;
+	$proto_rec->{'handle'} = $marc->[0]{'handle'};
+	$proto_rec->{'format'} = lc $format;
         if ($format =~ /usmarc$/io) {
-	    open(*file, $file) or mycarp "Open Error: $file, $!";
-	    binmode *file;
-	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'format'}='usmarc';
 	    $totalrecord = _readmarc($marc);
 	    close *file or mycarp "Close Error: $file, $!";
         }
         elsif ($format =~ /unimarc$/io) {
-	    open(*file, $file) or mycarp "Open Error: $file, $!";
-	    binmode *file;
-	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'format'}='unimarc';
 	    $totalrecord = _readmarc($marc);
 	    close *file or mycarp "Close Error: $file, $!";
         }
         elsif ($format =~ /marcmaker$/io) {
-	    open (*file, $file) or mycarp "Open Error: $file, $!";
-	    binmode *file;
-	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'lineterm'}="\015\012";	# MS-DOS default for MARCMaker
 	    $totalrecord = _readmarcmaker($marc);
 	    close *file or mycarp "Close Error: $file, $!";
@@ -119,76 +95,60 @@ sub new {
 	    return;
         }
         else {
-	    mycarp "I don't recognize that format $!";
+	    mycarp "I don't recognize format $format";
 	    return;
         }
     }
-    print "read in $totalrecord records\n" if $DEBUG;
+    print "read in $totalrecord records\n" if $MARC::DEBUG;
     return $marc;
+}
+####################################################################
+
+# clone returns a new MARC object with copies of the data.
+# Admin information remains linked to original.
+
+####################################################################
+
+sub clone {
+    my $marc = shift;
+    my $class = shift || ref $marc;
+    my $ans = $marc->new;
+    bless $ans, $class;
+    $ans->[0] = $marc->[0];
+    foreach my $i (1..$#$marc) {
+	my $rec = $marc->[$i];
+
+	my $newrec = $rec->clone();
+	bless $newrec, $class."::Rec";
+	push @$ans, $newrec;
+    }
+    return $ans;
 }
 
 ###################################################################
 # _readmarc() reads in a MARC file into the $marc object           #
 ###################################################################
-sub _readmarc {
+sub _readmarc { # also rec
     my $marc = shift;
     my $handle = $marc->[0]{'handle'};
+    my $proto_rec = $marc->[0]{'proto_rec'};
     my $increment = $marc->[0]{'increment'}; #pick out increment from the object
     my $recordcount = 0;
 
-    local $/ = "\035";	# cf. TPJ #14
-    local $^W = 0;	# no warnings
-    while (($increment==-1 || $recordcount<$increment) and my $line=<$handle>) {
-	my $recordlength = substr($line,0,5);
-	my $octets = length ($line);
-	$line=~s/[\n\r\cZ]//og;
-	last unless $line;
-	if ($recordlength =~ /\d{5}/o) {
-	    print "recordlength = $recordlength, length = $octets\n" if $DEBUG;
-	    unless ($recordlength == $octets) {
-	        mycarp "Invalid record, size does not match leader";
-		return unless ($recordcount);	# undef if first
-		return scalar (-$recordcount);	# if some are valid		
-	    }
+    while ($increment==-1 || $recordcount<$increment) {
+	my ($rec,$status)=$proto_rec->_readmarc();
+	last unless $status;
+	if ($status == -1) {
+	    mycarp "Invalid record, size does not match leader";
+	    return unless $recordcount;	# undef if first
+	    return -$recordcount;	        # if some are valid		
 	}
-	else {
+	if ($status == -2) {
 	    mycarp "Invalid record, leader size not numeric";
-	    return unless ($recordcount);	# undef if first
-	    return scalar (-$recordcount);	# if some are valid		
+	    return unless $recordcount;	# undef if first
+	    return -$recordcount;	        # if some are valid		
 	}
-
-	my @d = ();
-
-	$line=~/^(.{24})([^\036]*)\036(.*)/o;
-	my $leader=$1; my $dir=$2; my $data=$3;
-	my $rnum = $marc->createrecord({leader=>$leader});
-	my $record = $marc->[-1];
-
-	@d=$dir=~/(.{12})/go;
-	for my $d(@d) {
-	    my @field=();
-	    my $tag=substr($d,0,3);
-	    chop(my $field=substr($data,substr($d,7,5),substr($d,3,4)));
-	    if ($tag<10) {
-		@field=($tag,$field);
-	    }
-	    else {
-		my ($indi1, $indi2, $field_data) = unpack ("a1a1a*", $field);
-
-		push (@field, $tag, $indi1, $indi2);
-
-		my @subfields = split(/\037/,$field_data);
-		foreach (@subfields) {
-		    my $delim = substr($_,0,1);
-		    next unless $delim;
-		    my $subfield_data = substr($_,1);
-		    push(@field, $delim, $subfield_data);
-
-		} #end parsing subfields
-	    } #end testing tag number
-	    push(@{$record->{'array'}},\@field);
-	    $marc -> add_map($rnum,\@field);
-	} #end processing this field
+	push @$marc, $rec;
 	$recordcount++;
     } #end processing this record
     return $recordcount;
@@ -197,182 +157,37 @@ sub _readmarc {
 ###################################################################
 # readmarcmaker() reads a marcmaker file into the MARC object     #
 ###################################################################
-sub _readmarcmaker {
+sub _readmarcmaker { # rec
     my $marc = shift;
     my $handle = $marc->[0]{'handle'};
+    my $proto_rec = $marc->[0]{'proto_rec'};
     my $increment = $marc->[0]{'increment'}; #pick out increment from the object
     unless (exists $marc->[0]{'makerchar'}) {
         $marc->[0]{'makerchar'} = usmarc_default();	# hash ref
+	$proto_rec->{'makerchar'} = $marc->[0]{'makerchar'};
     }
-    my $charset = $marc->[0]{makerchar};
-    my $lineterm = $marc->[0]{'lineterm'} || "\015\012";
-	# MS-DOS file default for MARCMaker
     my $recordcount = 0;
-      #Set the file input separator to "\r\n\r\n", which is the same as 
-      #a blank line. A single blank line separates individual MARC records
-      #in the MARCMakr format.
-    local $/ = "$lineterm$lineterm";	# cf. TPJ #14
-    local $^W = 0;	# no warnings
-      #Read in each individual MARCMAKER record in the file
-    while (($increment==-1 or $recordcount<$increment) and my $record=<$handle>) {
-	  #Split each record on the "\n=" into the @fields array
-	my @lines=split "$lineterm=",$record;
-	my $leader = shift @lines;
-	unless ($leader =~ /^=LDR  /o) {
+
+    while ($increment==-1 or $recordcount<$increment) {
+	my ($rec,$status) = $proto_rec->_readmarcmaker();
+	last unless $status;
+	if ($status == -1)  {
 	    mycarp 'Invalid record, prefix "=LDR  " not found';
-	    return unless ($recordcount);	# undef if first
-	    return scalar (-$recordcount);	# if some are valid		
+	    return unless $recordcount;	# undef if first
+	    return -$recordcount;	# if some are valid		
 	}
-	$leader=~s/^=LDR  //o;	#Remove "=LDR  "
-	$leader=~s/[\n\r]//og;
-	$leader=~s/\\/ /go;	# substitute " " for \
-	my $rnum = $marc->createrecord({leader=>$leader});
-	foreach my $line (@lines) {
-	    #Remove newlines from @fields ; and also substitute " " for \
-	    $line=~s/[\n\r]//og;
-	    $line=~s/\\/ /go;
-	    #get the tag name
-	    my $tag = substr($line,0,3);
-	    my @field=(); #this will be added to $marc and the map updated.
-	    #if the tag is less than 010 (has no indicators or subfields)
-	    #then push the data into @$field
-	    if ($tag < 10) {
-		my $value = _maker2char (substr($line,5), $charset);
-#		$marc->addfield({record=>"$rnum", field=>"$tag",
-#				ordered=>"n", value=>[$value]});
-		@field=($tag,$value);
-	    }
-	    else {
-		#elseif the tag is greater than 010 (has indicators and 
-		#subfields then add the data to the $marc object
-		my $field_data=substr($line,7);
-		my $i1=substr($line,5,1);
-		my $i2=substr($line,6,1);
-		@field = ($tag,$i1,$i2);
-
-		my @subfields=split /\$/, $field_data; #get the subfields
-		foreach my $subfield (@subfields) {
-		    my $delim=substr($subfield,0,1); #extract subfield delimiter
-		    next unless $delim;
-		    my $subfield_data= _maker2char (substr($subfield,1),
-						    $charset);
-		    #extract subfield value
-		    push (@field, $delim, $subfield_data);
-		} #end parsing subfields
-
-#		$marc->addfield({record=>"$rnum", field=>"$tag",
-#				i1=>substr($line,5,1), i2=>substr($line,6,1),
-#				ordered=>"n", value=>\@field});
-	    } #end tag>10
-	    print "DEBUG: tag = $tag\n" if $DEBUG;
-	    push @{$marc->[$rnum]{'array'}},\@field;
-	    $marc -> add_map($rnum,\@field);
-	} #end reading this line
+	push @$marc, $rec;
 	$recordcount++;
     } #end reading this record
     return $recordcount;
 }
 
-sub _maker2char {
-    my $marc_string = shift;
-    my $charmap = shift;
-    while ($marc_string =~ /{(\w{1,8}?)}/o) {
-	if (exists ${$charmap}{$1}) {
-	    $marc_string = join (//, $`, ${$charmap}{$1}, $');
-	}
-	else {
-	    $marc_string = join (//, $`, '&', $1, ';', $');
-	}
-    }
-       # closing curly brace - part 2, permits {lcub}text{rcub} in input
-    $marc_string =~ s/\&rcub;/\x7d/go;
-    return $marc_string;
+sub _maker2char { # rec
+    return MARC::Rec::_maker2char(@_);
 }
 
-sub usmarc_default {
-    my @hexchar = (0x00..0x1a,0x1c,0x7f..0x8c,0x8f..0xa0,0xaf,0xbb,
-		   0xbe,0xbf,0xc7..0xdf,0xfc,0xfd,0xff);
-    my %inchar = map {sprintf ("%2.2X",int $_), chr($_)} @hexchar;
-
-    $inchar{esc} = chr(0x1b);		# escape
-    $inchar{dollar} = chr(0x24);	# dollar sign
-    $inchar{curren} = chr(0x24);	# dollar sign - alternate
-    $inchar{24} = chr(0x24);		# dollar sign - alternate
-    $inchar{bsol} = chr(0x5c);		# back slash (reverse solidus)
-    $inchar{lcub} = chr(0x7b);		# opening curly brace
-    $inchar{rcub} = "&rcub;";		# closing curly brace - part 1
-    $inchar{joiner} = chr(0x8d);	# zero width joiner
-    $inchar{nonjoin} = chr(0x8e);	# zero width non-joiner
-    $inchar{Lstrok} = chr(0xa1);	# latin capital letter l with stroke
-    $inchar{Ostrok} = chr(0xa2);	# latin capital letter o with stroke
-    $inchar{Dstrok} = chr(0xa3);	# latin capital letter d with stroke
-    $inchar{THORN} = chr(0xa4);		# latin capital letter thorn (icelandic)
-    $inchar{AElig} = chr(0xa5);		# latin capital letter AE
-    $inchar{OElig} = chr(0xa6);		# latin capital letter OE
-    $inchar{softsign} = chr(0xa7);	# modifier letter soft sign
-    $inchar{middot} = chr(0xa8);	# middle dot
-    $inchar{flat} = chr(0xa9);		# musical flat sign
-    $inchar{reg} = chr(0xaa);		# registered sign
-    $inchar{plusmn} = chr(0xab);	# plus-minus sign
-    $inchar{Ohorn} = chr(0xac);		# latin capital letter o with horn
-    $inchar{Uhorn} = chr(0xad);		# latin capital letter u with horn
-    $inchar{mlrhring} = chr(0xae);	# modifier letter right half ring (alif)
-    $inchar{mllhring} = chr(0xb0);	# modifier letter left half ring (ayn)
-    $inchar{lstrok} = chr(0xb1);	# latin small letter l with stroke
-    $inchar{ostrok} = chr(0xb2);	# latin small letter o with stroke
-    $inchar{dstrok} = chr(0xb3);	# latin small letter d with stroke
-    $inchar{thorn} = chr(0xb4);		# latin small letter thorn (icelandic)
-    $inchar{aelig} = chr(0xb5);		# latin small letter ae
-    $inchar{oelig} = chr(0xb6);		# latin small letter oe
-    $inchar{hardsign} = chr(0xb7);	# modifier letter hard sign
-    $inchar{inodot} = chr(0xb8);	# latin small letter dotless i
-    $inchar{pound} = chr(0xb9);		# pound sign
-    $inchar{eth} = chr(0xba);		# latin small letter eth
-    $inchar{ohorn} = chr(0xbc);		# latin small letter o with horn
-    $inchar{uhorn} = chr(0xbd);		# latin small letter u with horn
-    $inchar{deg} = chr(0xc0);		# degree sign
-    $inchar{scriptl} = chr(0xc1);	# latin small letter script l
-    $inchar{phono} = chr(0xc2);		# sound recording copyright
-    $inchar{copy} = chr(0xc3);		# copyright sign
-    $inchar{sharp} = chr(0xc4);		# sharp
-    $inchar{iquest} = chr(0xc5);	# inverted question mark
-    $inchar{iexcl} = chr(0xc6);		# inverted exclamation mark
-    $inchar{hooka} = chr(0xe0);		# combining hook above
-    $inchar{grave} = chr(0xe1);		# combining grave
-    $inchar{acute} = chr(0xe2);		# combining acute
-    $inchar{circ} = chr(0xe3);		# combining circumflex
-    $inchar{tilde} = chr(0xe4);		# combining tilde
-    $inchar{macr} = chr(0xe5);		# combining macron
-    $inchar{breve} = chr(0xe6);		# combining breve
-    $inchar{dot} = chr(0xe7);		# combining dot above
-    $inchar{diaer} = chr(0xe8);		# combining diaeresis
-    $inchar{uml} = chr(0xe8);		# combining umlaut
-    $inchar{caron} = chr(0xe9);		# combining hacek
-    $inchar{ring} = chr(0xea);		# combining ring above
-    $inchar{llig} = chr(0xeb);		# combining ligature left half
-    $inchar{rlig} = chr(0xec);		# combining ligature right half
-    $inchar{rcommaa} = chr(0xed);	# combining comma above right
-    $inchar{dblac} = chr(0xee);		# combining double acute
-    $inchar{candra} = chr(0xef);	# combining candrabindu
-    $inchar{cedil} = chr(0xf0);		# combining cedilla
-    $inchar{ogon} = chr(0xf1);		# combining ogonek
-    $inchar{dotb} = chr(0xf2);		# combining dot below
-    $inchar{dbldotb} = chr(0xf3);	# combining double dot below
-    $inchar{ringb} = chr(0xf4);		# combining ring below
-    $inchar{dblunder} = chr(0xf5);	# combining double underscore
-    $inchar{under} = chr(0xf6);		# combining underscore
-    $inchar{commab} = chr(0xf7);	# combining comma below
-    $inchar{rcedil} = chr(0xf8);	# combining right cedilla
-    $inchar{breveb} = chr(0xf9);	# combining breve below
-    $inchar{ldbltil} = chr(0xfa);	# combining double tilde left half
-    $inchar{rdbltil} = chr(0xfb);	# combining double tilde right half
-    $inchar{commaa} = chr(0xfe);	# combining comma above
-    if ($DEBUG) {
-        foreach my $str (sort keys %inchar) {
-            printf "%s = %x\n", $str, ord($inchar{$str});
-        }
-    }
-    return \%inchar;
+sub usmarc_default { # rec
+    return MARC::Rec::usmarc_default(@_);
 }
 
 ####################################################################
@@ -399,9 +214,12 @@ sub openmarc {
     $marc->[0]{'increment'}=$params->{'increment'} || 0;
         #store increment in the object, default is 0
     unless ($marc->[0]{'format'}) {$marc->[0]{'format'}="usmarc"}; #default to usmarc
-    open (*file, $file);
+    open(*file, $file) or mycarp "Open Error: $file, $!";
     binmode *file;
     $marc->[0]{'handle'}=\*file; #store filehandle in object
+    my $proto_rec = $marc->[0]{'proto_rec'};
+    $proto_rec->{'handle'} = $marc->[0]{'handle'};
+    $proto_rec->{'format'} = lc $marc->[0]{'format'};
     if ($marc->[0]{'format'} =~ /usmarc/oi) {
 	$totalrecord = _readmarc($marc);
     }
@@ -427,7 +245,7 @@ sub openmarc {
         }
 	return;
     }
-    print "read in $totalrecord records\n" if $DEBUG;
+    print "read in $totalrecord records\n" if $MARC::DEBUG;
     if ($totalrecord==0) {$totalrecord="0 but true"}
     return $totalrecord;    
 }
@@ -492,29 +310,11 @@ sub nextmarc {
 
 ####################################################################
 
-sub add_map {
+sub add_map { # rec
     my $marc=shift;
     my $recnum = shift;
     my $rafield = shift;
-    my $tag = $rafield->[0];
-    return undef if $tag eq '000'; #currently handle ldr yourself...
-    my @tmp = @$rafield;
-    my $field_len = $#tmp;
-    my $record = $marc->[$recnum];
-    if ($tag > 10 ) {
-	my $i1 = $rafield->[1];
-	my $i2 = $rafield->[2];
-	my $i12 = $i1.$i2;
-
-	for(my $i=3;$i<$field_len;$i+=2) {
-	    my $subf_code = $rafield->[$i];
-	    push(@{$record->{$tag}{$subf_code}}, \$rafield->[$i+1]);
-	}
-	push(@{$record->{$tag}{'i1'}{$i1}},$rafield);
-	push(@{$record->{$tag}{'i2'}{$i2}},$rafield);
-	push(@{$record->{$tag}{'i12'}{$i12}},$rafield);
-    }
-    push(@{$record->{$tag}{field}},$rafield);
+    $marc->[$recnum]->add_map($rafield);
 }
 
 ####################################################################
@@ -523,14 +323,12 @@ sub add_map {
 # index with all elements in the [recnum]{array} with that tag.
 
 ####################################################################
-sub rebuild_map {
+sub rebuild_map { # rec
     my $marc=shift;
     my $recnum = shift;
     my $tag = shift;
     return undef if $tag eq '000'; #currently ldr is different...
-    my @tagrefs = grep {$_->[0] eq $tag} @{$marc->[$recnum]{'array'}};
-    delete $marc->[$recnum]{$tag};
-    for (@tagrefs) {$marc->add_map($recnum,$_)};
+    $marc->[$recnum]->rebuild_map($tag);
 }
 
 ####################################################################
@@ -539,13 +337,10 @@ sub rebuild_map {
 # index with all elements in the [recnum]{array}
 
 ####################################################################
-sub rebuild_map_all {
+sub rebuild_map_all { # rec
     my $marc=shift;
     my $recnum = shift;
-
-    my %tags=();
-    map {$tags{$_->[0]}++} @{$marc->[$recnum]{'array'}};
-    foreach my $tag (keys %tags) {$marc->rebuild_map($recnum,$tag)};
+    $marc->[$recnum]->rebuild_map_all();
 }
 
 ####################################################################
@@ -556,84 +351,42 @@ sub rebuild_map_all {
 sub deletemarc {
     my $marc=shift;
     my $template=shift;
-    my %params = map {$_,${$template}{$_}} (keys %{$template});
-    while (@_) {
-	my $key = shift;
-	$params{$key} = shift;
-    }
-    my @delrecords=$params{record} || (1..$#$marc);
+
+    my $params = _params($template,@_);
+
+    my @delrecords= _records($marc,$params);
+    my %delrecords= map {$_=>1} @delrecords;
        #if records parameter not passed set to all records in MARC object
-    my $field=$params{field};
-    my $subfield=$params{subfield};
-##    my $occurence=$params{occurence};
+    my $field=$params->{field};
+    my $subfield=$params->{subfield};
+
     my $deletecount=0;
+    my @keepers = grep {!$delrecords{$_}} (0..$#$marc);
 
     #delete entire records
     if (not($field) and not($subfield)) {
-	#my @marc1=@$marc;
-	my @newmarc;
-	my $count=0;
-	foreach my $record (@$marc) {
-	    my $match=0;
-	    foreach my $delelement (@delrecords) {
-		if ($delelement==$count) {$match=1;last;}
-	    }
-	    if (not($match)) {push(@newmarc,$record)}
-	    else {$deletecount++}
-	    $count++;
-	}
+	my $class = ref $marc;
+	my @newmarc = @$marc[@keepers]; # array slice, look it up.
 	@$marc=@newmarc;
-	return $deletecount;
+	bless $marc,$class;
+	return @delrecords;
     }
 
-    #delete fields
-    elsif ($field and not($subfield)) {
-	for (my $record=1; $record<=$#$marc; $record++) {
-	    foreach my $delelement (@delrecords) {
-		if ($delelement != $record) {next}
-		if (exists $marc->[$record]{$field}) {
-		    foreach my $fieldref1 (@{$marc->[$record]{$field}{field}}) {
-			my $count=0;
-			foreach my $fieldref2 (@{$marc->[$record]{array}}) {
-			    if ($fieldref1 == $fieldref2) {
-				$deletecount++;
-				splice @{$marc->[$record]{array}},$count,1;
-				delete $marc->[$record]{$field};
-			    }
-			    $count++;
-			}
-		    }
-		}
-	    }
-	}
-	return $deletecount;
-    }
+    #delete fields and/or subfields. deletefirst takes care of the details.
+    # This may be slow. If so write a loop using deletesubfield, etc.
 
-    #delete subfields
-    elsif ($subfield) {
-	for (my $record=1; $record<=$#$marc; $record++) {
-	    foreach my $delelement (@delrecords) {
-		if ($delelement != $record) {next}
-		if ((exists $marc->[$record]{$field}) &&
-		    exists $marc->[$record]{$field}{$subfield}) {
-		    foreach my $subfieldref (@{$marc->[$record]{$field}{$subfield}}) {
-			foreach my $fieldref2 (@{$marc->[$record]{array}}) {
-			    my $count=0;
-			    foreach my $subfield2 (@$fieldref2) {
-				if ($$subfieldref eq $subfield2) {
-				    $deletecount++;
-				    splice @$fieldref2,$count-1,2;
-				    delete $marc->[$record]{$field}{$subfield};
-				}
-				$count++
-			    }
-			}
-		    }
-		}
-	    }
+    foreach my $i (1..$#$marc) {
+	next unless $delrecords{$i};
+	my $rec=$marc->[$i];
+	my @newfields =();
+	while (1) {
+	    my $has_subfield = $rec->deletefirst($template);
+	    last unless $has_subfield;
+	    $deletecount++;
 	}
-	return $deletecount;
+	$rec->rebuild_map($field);
     }
+    return $deletecount;
 }
 
 ####################################################################
@@ -643,26 +396,23 @@ sub deletemarc {
 # of a MARC object you could say $x=$x->selectmarc(["1-10","15"]); #
 ####################################################################
 sub selectmarc {
-    my $marc1=shift;
-    my @marc1=@$marc1;
-    my @marc2;
+    my $marc=shift;
     my $selarray=shift;
-    my $count=0;
-    my $selcount=0;
-    if (not($selarray)) {$selarray->[0]="1-$#marc1"} 
-    foreach my $record (@marc1) {
-	my $match=0;
-	foreach my $selelement (@$selarray) {
-	    if ($selelement=~/(\d+)-(\d+)/) {
-		if ($count>=$1 and $count<=$2) {$match=1;last;}
-	    }
-	    elsif ($selelement==$count) {$match=1;last;}
+
+    my @keepers=(0); # so we have admin information.
+    foreach my $selelement (@$selarray) {
+	if ($selelement=~/(\d+)-(\d+)/) {
+	    push @keepers,($1..$2);
+	} else {
+	    push @keepers, $selelement;
 	}
-	if ($match or $count==0) {push(@marc2,$record); $selcount++}
-	$count++;
     }
-    @$marc1=@marc2;
-    return $selcount-1; #minus off the $marc->[0] 
+    if (not($selarray)) {@{$selarray}= (1..$#$marc)} 
+    my $class = ref $marc;
+    my @newmarc = @$marc[@keepers]; # array slice, look it up.
+    @$marc=@newmarc;
+    bless $marc,$class;
+    return scalar(@keepers) -1; # minus off the $marc->[0] 
 }
 
 ####################################################################
@@ -674,15 +424,12 @@ sub searchmarc {
     my $marc=shift;
     my $template=shift;
     return unless (ref($template) eq "HASH");
-    my %params = map {$_,${$template}{$_}} (keys %{$template});
-    while (@_) {
-	my $key = shift;
-	$params{$key} = shift;
-    }
-    my $field=$params{field} || return;
-    my $subfield=$params{subfield};
-    my $regex=$params{regex};
-    my $notregex=$params{notregex};
+    my $params = _params($template,@_);
+
+    my $field=$params->{field} || return;
+    my $subfield=$params->{subfield};
+    my $regex=$params->{regex};
+    my $notregex=$params->{notregex};
     my @results;
     my $searchtype;
 
@@ -758,67 +505,46 @@ sub searchmarc {
 }
 
 ####################################################################
+
+# getfirstvalue() will return the first value of a field or subfield
+# or indicator or i12 in a particular record found in the MARC
+# object. It does not depend on the index being up to date.
+
+####################################################################
+sub getfirstvalue { # rec
+    my $marc= shift;
+    my $template=shift;
+    return unless (ref($template) eq "HASH");
+    my $record = $template->{record};
+    if (not($record)) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
+    my $marcrec = $marc->[$record];
+    return $marcrec->getfirstvalue($template);
+
+}
+
+####################################################################
 # getvalue() will return the value of a field or subfield in a     #
 # particular record found in the MARC object                       #
 ####################################################################
-sub getvalue {
+sub getvalue { # rec
     my $marc = shift;
     my $template=shift;
     return unless (ref($template) eq "HASH");
-    my %params = map {$_,${$template}{$_}} (keys %{$template});
-    while (@_) {
-	my $key = shift;
-	$params{$key} = shift;
-    }
-    my $record = $params{record};
+    my $params = _params($template,@_);
+    my $record = $params->{record};
     if (not($record)) {mycarp "You must specify a record"; return}
     if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
-    my $field = $params{field};
-    if (not($field)) {mycarp "You must specify a field"; return}
-    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
-    my $subfield = $params{subfield};
-    my $delim = $params{delimiter};
-    my @values;
-    if ($field and not($subfield)) {
-	return unless exists $marc->[$record]{$field};
-	if ($field eq '000') { return $marc->[$record]{'000'}[1]; }
-	foreach (my $i=0; $i<=$#{$marc->[$record]{$field}{field}}; $i++) {
-	    push @values, _joinfield($marc->[$record]{$field}{field}[$i],
-				     $field,$delim);
-	}
-	return @values;
-    }
-    elsif ($field and $subfield) {
-	return unless exists $marc->[$record]{$field};
-	return unless exists $marc->[$record]{$field}{$subfield};
-	if ($subfield eq "i1" || $subfield eq "i2" || $subfield eq "i12") {
-	    my @shortone = @{$marc->[$record]{$field}{field}};
-	    foreach (my $k=0; $k<=$#shortone; $k++) {
-		if ($subfield eq 'i1') {
-	            push @values, $shortone[$k][1];
-		}
-		elsif ($subfield eq 'i2') {
-	            push @values, $shortone[$k][2];
-		}
-		else {
-	            push @values, "$shortone[$k][1]$shortone[$k][2]";
-		}
-	    }
-	    return @values;
-	}
-	foreach (my $i=0; $i<=$#{$marc->[$record]{$field}{$subfield}}; $i++) {
-	    push @values, ${$marc->[$record]{$field}{$subfield}[$i]};
-	}
-	return @values;
-    }
+    
+    return $marc->[$record]->getvalue($params);
 }
 
 ####################################################################
 #Returns LDR at $record.                                           #
 ####################################################################
-sub ldr {
+sub ldr { # rec
     my ($self,$record)=@_;
-    return $self->[$record]{'000'}[1];
+    return $self->[$record]->ldr();
 }
 
 
@@ -828,24 +554,15 @@ sub ldr {
 #the record.                                                       #
 #Folk also like to know what Ctrl, Desc etc are.                   #
 ####################################################################
-sub unpack_ldr {
+sub unpack_ldr { # rec
     my ($self,$record) = @_;
-    my $ldr = $self->ldr($record);
-    my $rhldr = _unpack_ldr($self,$ldr);
-    $self->[$record]{unp_ldr}=$rhldr;
-    return $rhldr;
+    return $self->[$record]->unpack_ldr();
 }
 
     
-sub _unpack_ldr {
+sub _unpack_ldr { # rec
     my ($self,$ldr)=@_;
-    my %ans=();
-
-    my @fields=unpack($LDR_TEMPLATE,$ldr);
-    for (@LDR_FIELDS) {
-	$ans{$_}=shift @fields;
-    }
-    return \%ans;
+    return $self->[0]{proto_rec}->unpack_ldr($ldr);
 }
 
 
@@ -854,10 +571,9 @@ sub _unpack_ldr {
 #Returns the unpacked ldr as a ref to hash from the ref in $self.  #
 #Does not overwrite hash from ldr.                                 #
 ####################################################################
-sub get_hash_ldr {
+sub get_hash_ldr { # rec
     my ($self,$record)=@_;
-    return undef unless exists($self->[$record]{unp_ldr});
-    return $self->[$record]{unp_ldr};
+    return $self->[$record]->get_hash_ldr();
 }
 
 ####################################################################
@@ -865,97 +581,46 @@ sub get_hash_ldr {
 # is a hashed form. Returns undef unless there is a hash. Else
 # returns $ldr.
 ####################################################################
-sub pack_ldr {
+sub pack_ldr { # rec
     my ($self,$record)=@_;
-    return undef unless exists($self->[$record]{unp_ldr});
-    my $rhldr = $self->[$record]{unp_ldr};
-    my $ldr = $self -> _pack_ldr($rhldr);
-    $self->[$record]{'000'}[1] = $ldr;
-    return $ldr;
+    return $self->[$record]->pack_ldr();
 }
 
 ####################################################################
 #Takes a ref to hash version of the LDR and returns a string       #
 # version                                                          #
 ####################################################################
-sub _pack_ldr {
-
+sub _pack_ldr { # rec
     my ($self,$rhldr) = @_;
-    my @fields=();
-
-    for (@LDR_FIELDS) {
-	push @fields,$rhldr->{$_};
-    }
-    my $ans = pack($LDR_TEMPLATE,@fields);
-    return $ans;
+    return $self->[0]{proto_rec}->_pack_ldr($rhldr);
 }
 
 ####################################################################
 #Takes a string record number.                                     #
 #Returns a the format necessary to pack/unpack 008 fields correctly#
 ####################################################################
-sub bib_format {
+sub bib_format { # rec
     my ($self,$record)=@_;
-    $self->pack_ldr($record);
-    my $ldr = $self->ldr($record);
-    return $self->_bib_format($ldr);
+    return $self->[$record]->bib_format();
 }
 
-sub _bib_format {
+sub _bib_format { # rec
     my ($self,$ldr)=@_;
-    my $rldr=$self->_unpack_ldr($ldr);
-    my ($type,$bib_lvl) = ($rldr->{'Type'},$rldr->{'BLvl'});
-    return "UNKNOWN (Type $type Bib_Lvl $bib_lvl)" unless ($type=~/[abcdefgijkmprot]/ &&
-							   (($bib_lvl eq "") or 
-							    $bib_lvl=~/[abcdms]/)
-							   );
-
-    return "BOOKS" if (
-		       (
-			($type eq "a") && !($bib_lvl =~/[bs]/)
-			)
-		       or $type eq "t" or $type eq "b"
-		       ); #$type b is obsolete, 'tho.
-    return "SERIALS" if (
-			 ($type eq "a") && 
-			 ($bib_lvl =~/[bs]/)
-			 );
-    return "COMPUTER_FILES" if ($type =~/m/);
-    return "MAPS" if ($type =~/[ef]/);
-    return "MUSIC" if ($type =~/[cdij]/);
-    return "VIS" if ($type =~/[gkro]/);
-    return "MIX" if ($type =~/p/);
-    return "UNKNOWN (Type $type Bib_Lvl $bib_lvl) ??"; # Shouldn't happen
+    return $self->[0]{proto_rec}->_bib_format($ldr);
 }
 
 ####################################################################
 #Takes a record number.                                            #
 #Returns the unpacked 008 as a ref to hash. Installs ref in $self. #
 ####################################################################
-sub unpack_008 {
+sub unpack_008 { # rec
     my ($self,$record) = @_;
-    my ($ff_string) = $self->getvalue({record=>$record,field=>'008'});
-    my $bib_format = $self->bib_format($record);
-    my $rh008= _unpack_008($self, $ff_string,$bib_format);
-    $self->[$record]{unp_008}=$rh008;
-    return $rh008;
+    return $self->[$record]->unpack_008();
 }
 
-sub _unpack_008 {
+sub _unpack_008 { # rec
     my ($self,$ff_string,$bib_format) = @_;
-    my %ans=();
-
-    my $ff_templ=$FF_TEMPLATE{$bib_format};
-    my $raff_fields=$FF_FIELDS{$bib_format};
-    if ($bib_format =~/UNKNOWN/) {
-        mycarp "Format is $bib_format";
-	return;
-    }
-    my @fields=unpack($ff_templ,$ff_string);
-    for (@{$raff_fields}) {
-      $ans{$_}=shift @fields;
-    }
-    return \%ans;
+    return $self->[0]{proto_rec}->_unpack_008($ff_string,$bib_format);
 }
 
 ####################################################################
@@ -963,10 +628,9 @@ sub _unpack_008 {
 #Returns the unpacked 008 as a ref to hash from the ref in $self.  #
 #Does not overwrite hash from 008 field.                           #
 ####################################################################
-sub get_hash_008 {
+sub get_hash_008 { # rec
     my ($self,$record)=@_;
-    return undef unless exists($self->[$record]{unp_008});
-    return $self->[$record]{unp_008};
+    return $self->[$record]->get_hash_008();
 }
 
 ####################################################################
@@ -974,35 +638,18 @@ sub get_hash_008 {
 #Updates the 008 field from an installed fixed field hash.    
 #Returns undef unless there is a hash, else returns the 008 field  #
 ####################################################################
-sub pack_008 {
+sub pack_008 { # rec
     my ($self,$record) = @_;
-    $self->pack_ldr($record);
-    my $ldr = $self->ldr($record);
-    my $rhff = $self->get_hash_008($record);
-    return undef unless $rhff;
-    my $ff_string = $self->_pack_008($ldr,$rhff);
-    my $u008 = {field=>'008',record=>$record,ordered=>'y'};
-
-    $self->deletemarc($u008);
-    $self->addfield($u008, ($ff_string));
-
-    return $ff_string;
+    return $self->[$record]->pack_008();
 }
 
 ####################################################################
 #Takes LDR and ref to hash of unpacked 008                         #
 #Returns string version of 008 *without* newlines.                 #
 ####################################################################
-sub _pack_008 {
+sub _pack_008 { # rec
     my ($self,$ldr,$rhff) = @_;
-    my $bib_format = $self->_bib_format($ldr);
-    my $ans  = "";
-    my @fields = ();
-    for (@{$FF_FIELDS{$bib_format}}) {
-	push @fields, $rhff->{$_};
-    }
-    $ans = pack($FF_TEMPLATE{$bib_format},@fields);
-    return $ans;
+    return $self->[0]{proto_rec}->_pack_008($ldr,$rhff);
 }
 
 ####################################################################
@@ -1010,27 +657,8 @@ sub _pack_008 {
 # of an array of subfields. It takes an optional delimiter         #
 # parameter which will print out subfields if defined              #
 ####################################################################
-sub _joinfield {
-    my $array=shift;
-    my @array=@$array;
-    my $tag=shift;
-    my $delim=shift;
-    my $result;
-    if ($tag<10) {
-	$result=$array[1];
-    }
-    elsif ($delim) {
-	for (my $i=3; $i<=$#array; $i=$i+2) {
-	    $result.=$delim.$array[$i].$array[$i+1];
-	}
-    }
-    else {
-	for (my $i=4; $i<=$#array; $i=$i+2) {
-	    $result.=$array[$i];
-	    if ($result!~/ $/) {$result.=" "}
-	}
-    }
-    return $result;
+sub _joinfield { # rec
+    return MARC::Rec->_joinfield(@_);
 }
 
 ####################################################################
@@ -1043,8 +671,8 @@ sub _make_005 {
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
     # 1. Official specs for 005 are at 
     #     lcweb.loc.gov/marc/bibliographic/ecbdcntr.html
-    # They refer to X3.30 ansi; a copy of that would be of interest
-    # 2. Check out some examples for existing practice.
+    # They refer to X3.30 ansi; a copy of that would be of interest.
+    # 2. Checked out some examples for existing practice.
     $year += 1900;
     $mon++; #$mon is counted from 1 when talking to humans.
     return  "19960221075055.7" if $MARC::TEST;
@@ -1066,11 +694,10 @@ sub add_005s {
 	@records =@{$args->{'records'}};
     }
 
-    my @m005 = ('005', MARC::_make_005() );
+    my $time = MARC::_make_005() ;
     foreach my $i (@records) {
-	$marc->updatefirst({field=>'005',record=>$i},@m005);
+	$marc->[$i]->add_005($time);
     }
-    
 }
     
 ####################################################################
@@ -1083,7 +710,7 @@ sub output {
     my $output = "";
     my $newline = $args->{'lineterm'} || "\n";
 
-    $marc->add_005s($args) if ($args->{'file'} or $args->{'add_005s'});
+     $marc->add_005s($args) if ($args->{'file'} or $args->{'add_005s'});
 
     unless (exists $args->{'format'}) {
 	    # everything to string
@@ -1154,56 +781,822 @@ sub output {
 }
 
 ####################################################################
+# _records unpacks it hashref arg or defaults to the entire list
+####################################################################
+sub _records {
+    my ($marc,$args)=@_;
+    my $trecs =[];
+    my @records = ();
+    $trecs= [$args->{record}] if exists($args->{record});
+    $trecs= $args->{records} if $args->{records};
+
+    @records = @$trecs     if      @$trecs;
+    @records = (1..$#$marc) unless @$trecs;
+
+     return @records;
+}
+
+####################################################################
+
+# params takes a hashref and does a one level deep copy of it.
+# It uses the rest of the args to override elements of the hashref.
+# Returns a hashref so that caller does'nt have to worry about
+# crypto-context.
+
+####################################################################
+
+sub _params {
+    return MARC::Rec::_params(@_);
+}
+
+####################################################################
 # _writemarc() takes a MARC object as its input and returns the    #
 # the USMARC equivalent of the object as a string                  #
 ####################################################################
-sub _writemarc {
+sub _writemarc { #rec
     my $marc=shift;
+    my $args=shift;
+    #Read in each individual MARC record in the file
+    my @records = _records($marc,$args);
+
+    my $marcrecord="";
+    foreach my $i (@records) {
+	my $record = $marc->[$i];
+	$marcrecord .= $record->_writemarc($args);
+    }
+    return $marcrecord;
+}
+
+
+####################################################################
+# _marc2ascii() takes a MARC object as its input and returns the   #
+# ASCII equivalent of the object (field names, indicators, field   #
+# values and line-breaks)                                          #
+####################################################################
+sub _marc2ascii { # rec
+    my $marc=shift;
+    my $args=shift;
+    my @records = _records($marc,$args);
+    $args->{'lineterm'} ||= "\n";
+    my $output = "";
+    for my $i (@records) { #cycle through each record
+	my $record=$marc->[$i];
+	$output .= $record->_marc2ascii($args);
+    }
+    return $output;
+}
+
+####################################################################
+# _marcmaker() takes a MARC object as its input and converts it    #
+# into MARCMaker format, which is returned as a string             #
+####################################################################
+sub _marcmaker { # rec
+    my @output = ();
+    my $marc=shift;
+    my $args=shift;
+    $args->{'proto_rec'} = $marc->[0]{'proto_rec'};
+    my @records = _records($marc,$args);
+
+    local $^W = 0;	# no warnings
+    my $breaker = "";
+    for my $i (@records) { #cycle through each record
+	my $record=$marc->[$i];
+	$breaker .= $record->_marcmaker($args);
+    }
+    return $breaker;
+}
+
+sub _char2maker { # rec
+    return MARC::Rec::_char2maker(@_);
+}
+
+sub ustext_default { # rec
+    return MARC::Rec::ustext_default(@_);
+}
+
+####################################################################
+# _marc2html takes a MARC object as its input and converts it into #
+# HTML. It is possible to specify which field you want to output   #
+# as well as field labels to be used instead of the MARC codes.    #
+# The HTML is returned as a string                                 #
+####################################################################
+sub _marc2html {
+    my $marc = shift;
+    my $args = shift;
+    my $newline = $args->{'lineterm'} || "\n";
+
+    my @records = _records($marc,$args);
+    my $output = "";
+    foreach my $i (@records) {
+	my $marcrec=$marc->[$i];
+	$output.= $marcrec->_marc2html($args);
+    }
+    return $output;
+}
+
+
+####################################################################
+# _urls() takes a MARC object as its input, and then extracts the  #
+# control# (MARC 001) and URLs (MARC 856) and outputs them as      #
+# hypertext links in an HTML page. This could then be used with a  #
+# link checker to determine what URLs are broken.                  #
+####################################################################
+sub _urls { # rec
+    my $marc = shift;
+    my $args = shift;
+
+    my $output = "";
+    my @records = _records($marc,$args);
+
+    local $^W = 0;	# no warnings
+    foreach my $i (@records) {
+	my $marcrec=$marc->[$i];
+	$output .= $marcrec->_urls($args);
+    }
+    return $output;
+}
+
+####################################################################
+# isbd() attempts to create a quasi ISBD output format             #
+####################################################################
+sub _isbd { # rec
+    my $marc=shift;
+    my $args=shift;
+    my $newline = $args->{'lineterm'} || "\n";
+    my @records = _records($marc,$args);
+    my $output ="";
+    for my $i (@records) { #cycle through each record
+	my $record=$marc->[$i];
+	$output .= $record->_isbd($args);
+    }
+    return $output;
+}
+
+####################################################################
+# createrecord() appends a new record to the MARC object           #
+# and initializes the '000' field                                  #
+####################################################################
+sub createrecord { # rec
+    my $marc=shift;
+    local $^W = 0;	# no warnings
+    my $params=shift;
+    my $leader=$params->{'leader'} || "00000nam  2200000 a 4500";
+       #default leader see MARC documentation http://lcweb.loc.gov/marc
+    my $number=$#$marc + 1;
+    my $marcrec = $marc->[0]{'proto_rec'}->createrecord($leader);
+    push @$marc, $marcrec;
+    return $number;
+}
+
+####################################################################
+# addfield() appends/inserts a new field into an existing record   #
+####################################################################
+
+sub addfield {
+    my $marc=shift;
+    my $params=shift;
+    local $^W = 0;	# no warnings
+    my $record=$params->{'record'};
+    unless ($record) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
+    my $field = $params->{'field'};
+    unless ($field) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
+
+    my $i1=$params->{'i1'};
+    $i1 = ' ' unless (defined $i1);
+    my $i2=$params->{'i2'};
+    $i2 = ' ' unless (defined $i2);
+    my @value=$params->{'value'} || @_;
+    if (ref($params->{'value'}) eq "ARRAY") { @value = @{$params->{'value'}}; }
+    unless (defined $value[0]) {mycarp "No value specified"; return}
+
+    if ($field >= 10) {
+        if ($value[0] eq 'i1') {
+	    shift @value;
+	    $i1 = shift @value;
+        }
+        unless (1 == length($i1)) {
+	    mycarp "invalid \'i1\' specified";
+	    return;
+	}
+        if ($value[0] eq 'i2') {
+	    shift @value;
+	    $i2 = shift @value;
+        }
+        unless (1 == length($i2)) {
+	    mycarp "invalid \'i2\' specified";
+	    return;
+	}
+    }
+
+    my $ordered=$params->{'ordered'} || "y";
+    my $insertorder = $#{$marc->[$record]{array}} + 1;
+       #if necessary figure out the insert order to preserve tag order
+    if ($ordered=~/y/i) {
+	for (my $i=0; $i<=$#{$marc->[$record]{array}}; $i++) {
+	    if ($marc->[$record]{array}[$i][0] > $field) {
+		$insertorder=$i;
+		last;
+	    }
+	    if ($insertorder==0) {$insertorder=1}
+	}
+    }
+    my @field;
+    if ($field<10) {
+	push (@field, $field, $value[0]);
+	if ($ordered=~/y/i) {
+	    splice @{$marc->[$record]{array}},$insertorder,0,\@field; 
+	}
+	else {
+	    push (@{$marc->[$record]{array}},\@field);
+	}
+    }
+    else {
+	push (@field, $field, $i1, $i2);
+	my ($sub_id, $subfield);
+	while ($sub_id = shift @value) {
+	    last if ($sub_id eq "\036");
+	    $subfield = shift @value;
+	    push (@field, $sub_id, $subfield);
+	}
+	if ($ordered=~/y/i) {
+	    splice @{$marc->[$record]{array}},$insertorder,0,\@field;
+	}
+	else {
+	    push (@{$marc->[$record]{array}},\@field);
+	}
+    }
+    $marc->add_map($record,\@field);
+}
+
+####################################################################
+
+# getfields() takes a template and returns an array of fieldrefs from
+# $marc->[$recnum]{'array'} including all with the appropriate tag
+# and having the property that they are a contiguous group. (So may
+# include fields with other tags.)
+
+####################################################################
+sub getfields { # rec
+    my $marc=shift;
+    my $params=shift;
+    my $record=$params->{'record'};
+    unless ($record) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
+    return $marc->[$record]->getfields($params);
+
+}
+
+####################################################################
+# getupdate() returns an array of key,value pairs formatted to     #
+# pass to addfield(). For repeated tags, a "\036" element is used  #
+# to delimit data for separate addfield() commands                 #
+####################################################################
+sub getupdate {
+    my @output;
+    my $marc=shift;
+    my $params=shift;
+    my $record=$params->{'record'};
+    unless ($record) {mycarp "You must specify a record"; return}
+    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
+    my $field = $params->{'field'};
+    unless ($field) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
+
+    foreach my $fields (@{$marc->[$record]{array}}) { #cycle each field 
+	next unless ($field eq $fields->[0]);
+	if ($field<10) {
+	    push @output,$fields->[1];
+	}
+	else {
+	    push @output,'i1',$fields->[1],'i2',$fields->[2];
+	    my @subfields = @{$fields}[3..$#{$fields}];		
+	    while (@subfields) { #cycle through subfields incl. refs
+		my $subfield = shift @subfields;
+		last unless defined $subfield;
+		if (ref($subfield) eq "ARRAY") {
+		    foreach my $subsub (@{$subfield}) {
+		        push @output, $subsub;
+		    }
+		}
+		else {
+		    push @output, $subfield;
+		}
+	    } #finish cycling through subfields
+	} #finish tag test < 10
+	push @output,"\036";		
+    }
+    return @output;
+}
+#################################################################### 
+
+# deletefirst() takes a template and a boolean $do_rebuild_map to
+# rebuild the map. It deletes the field data for a first match, using
+# the template and leaves the rest alone. If the template has a
+# subfield element it deletes based on the subfield information in the
+# template. If the last subfield of a field is deleted, deletefirst()
+# also deletes the field.  It complains about attempts to delete
+# indicators.  If there is no match, it does nothing. Deletefirst also
+# rebuilds the map if $do_rebuild_map. Deletefirst returns the number
+# of matches deleted (that would be 0 or 1), or undef if it feels
+# grumpy (i.e. carps).
+
+####################################################################
+
+sub deletefirst { # rec
+    my $marc = shift || return;
+    my $template = shift;
+    my $recnum = $template->{'record'};
+    if (!$recnum) {mycarp "Need a record to confine my destructive tendencies"; return undef}
+    return $marc->[$recnum]->deletefirst($template);
+}
+
+#################################################################### 
+
+# field_is_empty takes a ref to an array formatted like
+# an element of $marc->[$recnum]{array}. It returns 1 if there are
+# no "significant" elements of the array (e.g. nothing but indicators
+# if $tag>10), else 0. Override this if you want to delete fields
+# that have "insignificant" subfields inside deletefirst.
+
+####################################################################
+sub field_is_empty { # rec
+    my ($marc,$rfield) = @_;
+    return $marc->[0]{proto_rec}->field_is_empty($rfield);
+}
+
+#################################################################### 
+
+# field_updatehook takes a ref to an array formatted like
+# $marc->[$recnum]{'array'}. It is there so that
+# subclasses can override it to do something before calling
+# addfield(), e.g.  store field-specific information in the affected
+# field or log information in an external file/database. One notes that
+# since this is a method, it can ignore its arguments and log global
+# information about $marc, e.g. order information in $marc->[$rnum]{'array'}
+
+####################################################################
+
+sub field_updatehook { # rec
+    my ($marc,$rfield)=@_;
+    $marc->[0]{'proto_rec'}->field_updatehook($rfield);
+}
+
+#################################################################### 
+
+# updatefirst() takes a template, a request to rebuild the index, and
+# an array from $marc->[recnum]{array}. It replaces/creates the field
+# data for a first match, using the template, and leaves the rest
+# alone. If the template has a subfield element, (this includes
+# indicators) it ignores all other information in the array and only
+# updates/creates based on the subfield information in the array. If
+# the template has no subfield information then indicators are left
+# untouched unless a new field needs to be created, in which case they
+# are left blank.
+
+####################################################################
+
+sub updatefirst { # rec
+    my $marc = shift || return;
+    my $template = shift;
+    return unless (ref($template) eq "HASH");
+    return unless (@_);
+    return if (defined $template->{'value'});
+
+    my $recnum = $template->{'record'};
+    if (!$recnum) {mycarp "Need a record to confine my changing needs."; return undef}
+    return $marc->[$recnum]->updatefirst($template,@_);
+}
+
+####################################################################
+
+# updatefields() takes a template which specifies recnum, a
+# $do_rebuild_map and a field (needs the field in case $rafields->[0]
+# is empty). It also takes a ref to an array of fieldrefs formatted
+# like the output of getfields(), and replaces/creates the field
+# data. It assumes that it should remove the fields with the first tag
+# in the fieldrefs. It calls rebuild_map() if $do_rebuild_map.
+
+####################################################################
+sub updatefields { # rec
+    my $marc = shift || return;
+    my $template = shift;
+
+    my $rafieldrefs = shift;
+    my $recnum = $template->{'record'};
+    return $marc->[$recnum]->updatefields($template,$rafieldrefs);
+}
+
+####################################################################
+
+# getmatch() takes a subfield code (can be an indicator) and a fieldref
+# Returns 0 or a ref to the value to be updated.
+
+####################################################################
+sub getmatch { # rec
+    my $marc = shift || return;
+    return $marc->[0]{proto_rec}->getmatch(@_);
+}
+
+####################################################################
+
+# deletesubfield() takes a subfield code (can not be an indicator) and a
+# fieldref. Deletes the subfield code and its value in the fieldref at
+# the first match on subfield code.  Assumes there is an exact
+# subfield match in $fieldref.
+
+####################################################################
+sub deletesubfield { # rec
+    my $marc = shift || return;
+    return $marc->[0]{proto_rec}->deletesubfield(@_);
+}
+
+####################################################################
+
+# insertpos() takes a subfield code (can not be an indicator), a
+# value, and a fieldref. Updates the fieldref with the first
+# place that the fieldref can match. Assumes there is no exact
+# subfield match in $fieldref.
+
+####################################################################
+sub insertpos { # rec
+    my $marc = shift || return;
+    return $marc->[0]{proto_rec}->insertpos(@_);
+}
+    
+
+####################################################################
+# updaterecord() takes an array of key/value pairs, formatted like #
+# the output of getupdate(), and replaces/creates the field data.  #
+# For repeated tags, a "\036" element is used to delimit data into #
+# separate addfield() commands.                                    #
+####################################################################
+sub updaterecord {
+    my $marc = shift || return;
+    my $template = shift;
+    return unless (ref($template) eq "HASH");
+    return unless (@_);
+    return if (defined $template->{'value'});
+    my $count = 0;
+    my @records = ();
+    unless ($marc->deletemarc($template)) {mycarp "not deleted\n"; return;}
+    foreach my $y1 (@_) {
+        unless ($y1 eq "\036") {
+    	    push @records, $y1;
+	    next;
+        }
+        unless ($marc->addfield($template, @records)) {
+	    mycarp "not added\n";
+	    return;
+	}
+        @records = ();
+	$count++;
+    }
+    return $count;
+}
+
+####################################################################
+# _offset is an internal subroutine used by writemarc to offset    #
+# number ie. making "34" into "00034".                             #
+#################################################################### 
+sub _offset{
+    return MARC::Rec::_offset(@_);
+}
+
+####################################################################
+
+# MARC::Rec is responsible for the methods and representation of
+# a single MARC record. Its protocol is very close to that of MARC:
+# in fact, most MARC methods have been moved here without the record
+# number and re-implemented in standard form by delegation.
+
+####################################################################
+
+package MARC::Rec;
+use Carp;
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS
+	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
+	    );
+
+$VERSION = $MARC::VERSION;
+
+@ISA = qw(Exporter);
+@EXPORT= qw();
+@EXPORT_OK= qw();
+
+#### Not using these yet
+
+#### %EXPORT_TAGS = (USTEXT	=> [qw( marc2ustext )]);
+#### Exporter::export_ok_tags('USTEXT');
+#### $EXPORT_TAGS{ALL} = \@EXPORT_OK;
+
+# gotta know where to find leader information....
+
+@LDR_FIELDS = qw(rec_len RecStat Type BLvl Ctrl Undefldr base_addr
+		 ELvl Desc ln_rec len_len_field len_start_char len_impl Undef2ldr);
+
+$LDR_TEMPLATE = "a5aaaaa3a5aaaaaaa";
+
+#...And the 008 field has a special place in Librarians' hearts.
+%FF_FIELDS = (
+	      BOOKS =>
+	      [qw(Entered DtSt Date1 Date2 Ctry Ills Audn Form Cont
+		  GPub Conf Fest Indx Undef1 Fict Biog Lang MRec Srce)],
+	      COMPUTER_FILES => 
+	      [qw(Entered DtSt Date1 Date2 Ctry Undef1 Audn Undef2 
+		  File Undef3 GPub Undef4 Lang MRec Srce)],
+	      MAPS =>
+	      [qw(Entered DtSt Date1 Date2 Ctry Relf Proj Prme CrTp
+		  Undef1 GPub Undef2 Indx Undef3 SpFm Lang MRec Srce)],
+	      MUSIC =>        
+	      [qw(Entered DtSt Date1 Date2 Ctry Comp FMus Undef1 Audn
+		  Form AccM LTxt Undef2 Lang MRec Srce)],
+	      SERIALS =>	
+	      [qw(Entered DtSt Date1 Date2 Ctry Freq Regl ISSN SrTp
+		  Orig Form EntW Cont GPub Conf Undef1 Alph S_L Lang MRec Srce)],
+	      VIS =>
+	      [qw(Entered DtSt Date1 Date2 Ctry Time Undef1 
+		  Audn AccM GPub Undef2 TMat Tech Lang MRec Srce)],
+	      MIX =>
+	      [qw(Entered DtSt Date1 Date2 
+		  Ctry Undef1 Form Undef2 Lang MRec Srce)]
+	      );
+
+%FF_TEMPLATE = (
+		BOOKS          =>   "a6a1a4a4a3a4a1a1a4a1a1a1a1a1a1a1a3a1a1",
+		COMPUTER_FILES =>   "a6a1a4a4a3a4a1a3a1a1a1a6a3a1a1",
+		MAPS           =>   "a6a1a4a4a3a4a2a1a1a2a1a2a1a1a2a3a1a1",
+		MUSIC          =>   "a6a1a4a4a3a2a1a1a1a1a6a2a3a3a1a1",
+		SERIALS        =>   "a6a1a4a4a3a1a1a1a1a1a1a1a3a1a1a3a1a1a3a1a1",
+		VIS            =>   "a6a1a4a4a3a3a1a1a5a1a4a1a1a3a1a1",
+		MIX            =>   "a6a1a4a4a3a5a1a11a3a1a1"
+		);
+
+# Preloaded methods go here.
+####################################################################
+# _offset is an internal subroutine used by writemarc to offset    #
+# number ie. making "34" into "00034".                             #
+#################################################################### 
+sub _offset{
+    my $value=shift;
+    my $digits=shift;
+    print "DEBUG: _offset value = $value, digits = $digits\n" if $MARC::DEBUG;
+    my $x=length($value);
+    $x=$digits-$x;
+    $x="0"x$x."$value";
+}
+
+sub mycarp { # rec
+    Carp::carp (@_) unless $MARC::TEST;
+}
+
+####################################################################
+
+# This is the constructor method that creates the MARC::Rec object. It
+# sets up references and gets out. Any file it knows about will be an
+# already opened filehandle: do error checking and binmode on the file
+# outside MARC::Rec.
+
+####################################################################
+sub new { # rec
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my $filehandle = shift;
+    my $marcrec = {}; 
+    bless ($marcrec, $class);
+    my $format = shift || "usmarc";
+
+    $marcrec->{'handle'} ||= \*filehandle;
+    $marcrec->{'format'}=$format;
+    $marcrec->{'lineterm'}="\015\012" if $format eq 'marcmaker';
+    # MS-DOS default for MARCMaker
+    return $marcrec;
+}
+
+####################################################################
+
+# Copy_struct returns a copy of the marcrec ($proto) without
+# {array} and map information. The copy shares references to
+# {handle} by design.
+
+####################################################################
+sub copy_struct {
+    my $proto = shift;
+    my $class = ref($proto);
+    my $newrec;
+    for (keys %$proto) {
+	$newrec->{$_} = $proto->{$_} if /^(handle|format|proto_rec)$/;
+    }
+    return bless $newrec,$class;
+}
+
+####################################################################
+
+# clone returns a new MARC::Rec object with copies of the data.
+# Admin information remains linked to original.
+
+####################################################################
+sub clone {
+    my $marcrec=shift;
+    my $ldr = $marcrec->ldr();
+    my $ans = $marcrec->createrecord($ldr);
+    for (@{$marcrec->{array}}) {
+	next if $_->[0] eq '000';
+	my @field = @$_;
+	my $rfield = \@field;
+	push @{$ans->{array}}, $rfield;
+	$ans->add_map($rfield);
+    }
+    return $ans;
+}
+
+#################################################################### 
+
+# field_is_empty takes a ref to an array formatted like
+# an element of $marc->[$recnum]{array}. It returns 1 if there are
+# no "significant" elements of the array (e.g. nothing but indicators
+# if $tag>10), else 0. Override this if you want to delete fields
+# that have "insignificant" subfields inside deletefirst.
+
+####################################################################
+sub field_is_empty { # rec
+    my ($marcrec,$rfield) = @_;
+
+    my $tag = $rfield->[0];
+    my @field = @$rfield;
+    return 1 if ($tag > 10 and !defined($field[3]));
+    return 1 if ($tag < 10 and !defined($field[1]) );
+    return 0;
+}
+
+####################################################################
+
+# field_updatehook echos the version in MARC without the recordnum.
+
+####################################################################
+sub field_updatehook { # rec
+# nothing. Subclass may want to handle this.
+}
+
+
+####################################################################
+
+# getfields() takes a template and returns an array of fieldrefs from
+# $marc->[$recnum]{'array'} including all with the appropriate tag
+# and having the property that they are a contiguous group. (So may
+# include fields with other tags.)
+
+####################################################################
+sub getfields { # rec
+
+    my $marcrec=shift;
+    my $params=shift;
+
+    my $field = $params->{'field'};
+    unless ($field) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
+
+    my @ans=();
+    my $first = undef;
+    my $last = $first; 
+    my $pos = 0;
+    for (@{$marcrec->{'array'}}) {
+	$first = $pos if ($_->[0] eq $field && !defined($first)) ;
+	$last = $pos if $_->[0] eq $field;
+	$pos++;
+    }
+    return () unless defined($first);
+    return @{$marcrec->{'array'}}[$first..$last]; # array slice. Look it up.
+}
+
+#################################################################### 
+
+# deletefirst() takes a template and a boolean $do_rebuild_map to
+# rebuild the map. It deletes the field data for a first match, using
+# the template and leaves the rest alone. If the template has a
+# subfield element it deletes based on the subfield information in the
+# template. If the last subfield of a field is deleted, deletefirst()
+# also deletes the field.  It complains about attempts to delete
+# indicators.  If there is no match, it does nothing. Deletefirst also
+# rebuilds the map if $do_rebuild_map. Deletefirst returns the number
+# of matches deleted (that would be 0 or 1), or undef if it feels
+# grumpy (i.e. carps).
+
+####################################################################
+
+sub deletefirst { # rec
+    my $marcrec = shift || return;
+    my $template = shift;
+    return unless (ref($template) eq "HASH");
+    return if (defined $template->{'value'});
+
+    my $field = $template->{'field'};
+
+    my $subfield = $template->{'subfield'};
+    my $do_rebuild_map = $template->{'rebuild_map'};
+    if (defined($subfield) and $subfield =~/^i[12]$/) {mycarp "Cannot delete indicators"; return undef}
+#I know that $marc->{$field}{field} is this information
+#But I don't want to depend on the map being up-to-date allways.
+
+    my @fieldrefs = $marcrec->getfields($template); #helps with cjk.
+
+    return 0 unless scalar(@fieldrefs);
+    
+    if ($field and not($subfield)) {
+	shift @fieldrefs;
+	$marcrec->updatefields($template,\@fieldrefs);
+	$marcrec->rebuild_map($field) if $do_rebuild_map;
+	return 1;
+    }
+
+
+    #Linear search for the field where deletion happens and the position 
+    #in that field.
+    my $rvictim=0;
+    my $fieldnum = 0;
+    foreach my $fieldref (@fieldrefs) {
+	if ($marcrec->getmatch($subfield,$fieldref)){
+	    $rvictim=$fieldref;
+	    last;
+	}
+	$fieldnum++;
+    }
+    if (!$rvictim) {
+	$marcrec->rebuild_map($field) if $do_rebuild_map;
+	return 0;
+    }
+
+    #Now we know that we have a field and subfield with a match.
+    #Find the first one and kill it. Kill the enclosing field 
+    #if it is the last one.
+    $marcrec->deletesubfield($subfield,$rvictim);
+    $marcrec->field_updatehook($rvictim);
+    if ($marcrec->field_is_empty($rvictim)) {
+	splice @fieldrefs,$fieldnum,1;
+	$marcrec->updatefields($template,\@fieldrefs);
+    }
+    #here we don't need to directly touch $marc->{array}
+    # since we are not changing its structure.
+    $marcrec->rebuild_map($field) if $do_rebuild_map;
+    return 1;
+}
+
+sub _params {
+    my $template =shift;
+    return {} unless ref $template eq 'HASH';
+    my %params = %$template;
+    %params = (%params,@_);
+    return \%params;
+}
+
+####################################################################
+# _writemarc() takes a MARC object as its input and returns the    #
+# the USMARC equivalent of the object as a string                  #
+####################################################################
+sub _writemarc { # rec
+    my $marcrec=shift;
     my $args=shift;
     my (@record, $fieldbase, $fielddata, $fieldlength, $fieldposition, 
 	$marcrecord, $recordlength);
-
-    #Read in each individual MARC record in the file
-    my @records;
-    if ($args->{'records'}) {@records=@{$args->{'records'}}}
-    else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
-    foreach my $i (@records) {
-	my $record = $marc->[$i];
-	#Reset variables
-        my $position=0; my $directory=""; my $fieldstream=""; 
-	my $leader=$record->{'000'}[1];
-	foreach my $field (@{$record->{'array'}}) {
-	    my $tag = $field->[0];
-	    if ($tag eq '000') {next}; #don't output the directory!
-	    my $fielddata="";
-	    if ($tag < 10) {
-		$fielddata=$field->[1]; 
-	    }
-	    else {
-		$fielddata.=$field->[1].$field->[2]; #add on indicators
-		my @subfields=@{$field}[3..$#{$field}];
-		while (@subfields) {
-		    $fielddata.="\037".shift(@subfields); #shift off subfield delimiter
-		    $fielddata.=shift(@subfields); #shift off subfield value
-		}
-	    }
-	    $fielddata.="\036";
-	    $fieldlength=_offset(length($fielddata),4);
-	    $fieldposition=_offset($position,5);
-	    $directory.=$tag.$fieldlength.$fieldposition;
-	    $position+=$fieldlength;
-	    $fieldstream.=$fielddata;
+    
+    my $record = $marcrec;
+    #Reset variables
+    my $position=0; my $directory=""; my $fieldstream=""; 
+    my $leader=$record->{'000'}[1];
+    foreach my $field (@{$record->{'array'}}) {
+	my $tag = $field->[0];
+	if ($tag eq '000') {next}; #don't output the directory!
+	my $fielddata="";
+	if ($tag < 10) {
+	    $fielddata=$field->[1]; 
 	}
-	$directory.="\036";
-	$fieldstream.="\035";
-	$fieldbase=24+length($directory);
-	$fieldbase=_offset($fieldbase,5);
-	$recordlength=24+length($directory)+length($fieldstream);
-	$recordlength=_offset($recordlength,5);
-	$leader=~s/^.{5}(.{7}).{5}(.{7})/$recordlength$1$fieldbase$2/;
-	$marcrecord.="$leader$directory$fieldstream";
-	$record->{'000'}[1] = $leader;	# save recomputed version
+	else {
+	    $fielddata.=$field->[1].$field->[2]; #add on indicators
+	    my @subfields=@{$field}[3..$#{$field}];
+	    while (@subfields) {
+		$fielddata.="\037".shift(@subfields); #shift off subfield delimiter
+		$fielddata.=shift(@subfields); #shift off subfield value
+	    }
+	}
+	$fielddata.="\036";
+	$fieldlength=_offset(length($fielddata),4);
+	$fieldposition=_offset($position,5);
+	$directory.=$tag.$fieldlength.$fieldposition;
+	$position+=$fieldlength;
+	$fieldstream.=$fielddata;
     }
+    $directory.="\036";
+    $fieldstream.="\035";
+    $fieldbase=24+length($directory);
+    $fieldbase=_offset($fieldbase,5);
+    $recordlength=24+length($directory)+length($fieldstream);
+    $recordlength=_offset($recordlength,5);
+    $leader=~s/^.{5}(.{7}).{5}(.{7})/$recordlength$1$fieldbase$2/;
+
+    $marcrecord ="$leader$directory$fieldstream";
+
+    $record->{'000'}[1] = $leader;	# save recomputed version
     return $marcrecord;
 }
     
@@ -1213,32 +1606,28 @@ sub _writemarc {
 # values and line-breaks)                                          #
 ####################################################################
 sub _marc2ascii {
-    my $output;
-    my $marc=shift;
+
+    my $marcrec=shift;
     my $args=shift;
-    my @records;
     my $newline = $args->{'lineterm'} || "\n";
-    if ($args->{'records'}) {@records=@{$args->{'records'}}}
-    else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
-    for my $i (@records) { #cycle through each record
-	my $record=$marc->[$i];
-	foreach my $fields (@{$record->{'array'}}) { #cycle each field 
-	    my $tag=$fields->[0];
-	    print "ASCII: tag = $tag\n" if ($DEBUG);
-	    if ($tag<10) {
-		$output.="$fields->[0]  $fields->[1]";
-	    }
-	    else {
-		$output.="$tag  $fields->[1]$fields->[2]  ";
-		my @subfields = @{$fields}[3..$#{$fields}];		
-		while (@subfields) { #cycle through subfields
-		    $output .= "\$".shift(@subfields).shift(@subfields);
-		} #finish cycling through subfields
-	    } #finish tag test < 10
-	    $output .= "$newline"; #put a newline at the end of the field
+    my $output = "";
+    my $record=$marcrec;
+    foreach my $fields (@{$record->{'array'}}) { #cycle each field 
+	my $tag=$fields->[0];
+	print "ASCII: tag = $tag\n" if $MARC::DEBUG;
+	if ($tag<10) {
+	    $output.="$fields->[0]  $fields->[1]";
 	}
-	$output.="$newline"; #put an extra newline to separate records
+	else {
+	    $output.="$tag  $fields->[1]$fields->[2]  ";
+	    my @subfields = @{$fields}[3..$#{$fields}];		
+	    while (@subfields) { #cycle through subfields
+		$output .= "\$".shift(@subfields).shift(@subfields);
+	    } #finish cycling through subfields
+	} #finish tag test < 10
+	$output .= $newline; #put a newline at the end of the field
     }
+    $output.=$newline; #put an extra newline to separate records
     return $output;
 }
 
@@ -1246,59 +1635,58 @@ sub _marc2ascii {
 # _marcmaker() takes a MARC object as its input and converts it    #
 # into MARCMaker format, which is returned as a string             #
 ####################################################################
-sub _marcmaker {
+sub _marcmaker { # rec
     my @output = ();
-    my $marc=shift;
+    my $marcrec=shift;
     my $args=shift;
-    my @records;
-    if ($args->{'records'}) {@records=@{$args->{'records'}}}
-    else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
+    my $proto_rec=$args->{'proto_rec'};
     unless (exists $args->{'charset'}) {
-        unless (exists $marc->[0]{'brkrchar'}) {
-	    $marc->[0]{'brkrchar'} = ustext_default();	# hash ref
+        unless (exists $proto_rec->{'brkrchar'}) {
+	    $proto_rec->{'brkrchar'} = ustext_default();	# hash ref
 	}
-	$args->{'charset'} = $marc->[0]{'brkrchar'};
+	$args->{'charset'} = $proto_rec->{'brkrchar'};
+	$proto_rec->{'charset'}  = $proto_rec->{'brkrchar'};
     }
     local $^W = 0;	# no warnings
-    for my $i (@records) { #cycle through each record
-	my $record=$marc->[$i];
-	foreach my $fields (@{$record->{'array'}}) { #cycle each field 
-	    my $tag=$fields->[0];
-	    print "OUT: tag = $tag\n" if ($DEBUG);
-	    if ($tag eq '000') {
-		my $value=$fields->[1];
-		$value=~s/ /\\/go;
-		push @output, "=LDR  $value";
-	    }
-	    elsif ($tag<10) {
-		my $value = _char2maker($fields->[1], $args->{'charset'});
-		$value=~s/ /\\/go;
-		push @output, "=$tag  $value";
-	    }
-	    else {
-		my $indicator1=$fields->[1];
-		$indicator1=~s/ /\\/;
-		my $indicator2=$fields->[2];
-		$indicator2=~s/ /\\/;
-		my $output="=$tag  $indicator1$indicator2";
-		my @subfields = @{$fields}[3..$#{$fields}];		
-		while (@subfields) { #cycle through subfields
-		    my $subfield_id = shift(@subfields);
-		    my $subfield = _char2maker( shift(@subfields),
-						$args->{'charset'} );
-		    $output .= "\$$subfield_id$subfield";
-		} #finish cycling through subfields
-		push @output, $output;
-	    } #finish tag test < 10
+
+    my $record=$marcrec;
+    foreach my $fields (@{$record->{'array'}}) { #cycle each field 
+	my $tag=$fields->[0];
+	print "OUT: tag = $tag\n" if $MARC::DEBUG;
+	if ($tag eq '000') {
+	    my $value=$fields->[1];
+	    $value=~s/ /\\/go;
+	    push @output, "=LDR  $value";
 	}
-	push @output,""; #put an extra blank line to separate records
+	elsif ($tag<10) {
+	    my $value = _char2maker($fields->[1], $args->{'charset'});
+	    $value=~s/ /\\/go;
+	    push @output, "=$tag  $value";
+	}
+	else {
+	    my $indicator1=$fields->[1];
+	    $indicator1=~s/ /\\/;
+	    my $indicator2=$fields->[2];
+	    $indicator2=~s/ /\\/;
+	    my $output="=$tag  $indicator1$indicator2";
+	    my @subfields = @{$fields}[3..$#{$fields}];		
+	    while (@subfields) { #cycle through subfields
+		my $subfield_id = shift(@subfields);
+		my $subfield = _char2maker( shift(@subfields),
+					    $args->{'charset'} );
+		$output .= "\$$subfield_id$subfield";
+	    } #finish cycling through subfields
+	    push @output, $output;
+	} #finish tag test < 10
     }
+    push @output,""; #put an extra blank line to separate records
+    
     my $newline = $args->{'lineterm'} || "\015\012";
     if ($args->{'nolinebreak'}) {
-        my $breaker1 = join ($newline, @output) . $newline;
-        return $breaker1;
+	my $breaker1 = join ($newline, @output) . $newline;
+	return $breaker1;
     }
-	# linebreak on by default
+# linebreak on by default
     my @output2 = ();
     foreach my $outline (@output) {
 	if (length($outline) < 66) {
@@ -1320,14 +1708,14 @@ sub _marcmaker {
 	    push @output2, $outline2;
 	}
     }
-    my $breaker = join ($newline, @output2) . $newline;
+    my $breaker = join ($newline, @output2);
     return $breaker;
 }
 
 sub _char2maker {
     my @marc_string = split (//, shift);
     my $charmap = shift;
-    my $maker_string = join (//, map { ${$charmap}{$_} } @marc_string);
+    my $maker_string = join ('', map { ${$charmap}{$_} } @marc_string);
     while ($maker_string =~ s/(&)([^ ]{1,7}?)(;)/{$2}/o) {}
     return $maker_string;
 }
@@ -1410,7 +1798,7 @@ sub ustext_default {
     $outchar{chr(0xfa)} = '{ldbltil}';	# combining double tilde left half
     $outchar{chr(0xfb)} = '{rdbltil}';	# combining double tilde right half
     $outchar{chr(0xfe)} = '{commaa}';	# combining comma above
-    if ($DEBUG) {
+    if ($MARC::DEBUG) {
         foreach my $num (sort keys %outchar) {
             printf "%x = %s\n", ord($num), $outchar{$num};
         }
@@ -1424,46 +1812,37 @@ sub ustext_default {
 # as well as field labels to be used instead of the MARC codes.    #
 # The HTML is returned as a string                                 #
 ####################################################################
-sub _marc2html {
-    my $marc = shift;
+sub _marc2html { # rec
+    my $marcrec = shift;
     my $args = shift;
     my $newline = $args->{'lineterm'} || "\n";
     my $output = "";
     my $outputall = 1;
-    my @alltags = sort(keys(%{$args}));
-    my @tags = ();
-    foreach my $tag (@alltags) {
-        push (@tags, $tag) if ($tag =~ /^[0-9]/);
-    }
+
+    my @tags =();
+    @tags = grep /^[0-9]/, sort(keys(%{$args}));
+
     $outputall = 0 if (scalar(@tags));
     if (defined $args->{'fields'}) {
         if ($args->{'fields'} =~ /all$/oi) {$outputall=1} ## still needed ?????
     }
-    my @records;
-    if ($args->{'records'}) {@records=@{$args->{'records'}}}
-    else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
+
+
+    my %tags =();
+
+    %tags = map {$_=>1} @tags;
+    %tags = map {$_->[0]=>1} @{$marcrec->{'array'}} if $outputall;
       #if 'all' fields are specified then set $outputall flag to yes
     local $^W = 0;	# no warnings
-    foreach my $i (@records) {
-	my $j=$marc->[$i];
-	$output.="$newline<p>";
-	if ($outputall) {
-	    foreach my $k ($j->{'array'}) {
-		foreach my $l (@$k) {
-		    $output.=$l->[0]." "._joinfield($l,$l->[0])."<br>$newline";
-		}
-	    }		
-	}
-	else {
-	    foreach my $tag (@tags) {
-		foreach my $field (@{$j->{$tag}{field}}) {
-		    $output.=$args->{$tag}." "._joinfield($field,$tag).
-			     "<br>$newline";
-		}
-	    }
-	}		
-	$output.="</p>";
+
+    my $j=$marcrec;
+    $output.= $newline."<p>";
+    
+    foreach my $rfield (@{$j->{'array'}}) {
+	$output.= $rfield->[0]." ".$j->_joinfield($rfield,$rfield->[0])."<br>".$newline
+	    if $tags{$rfield->[0]};
     }
+    $output.="</p>";
     return $output;
 }
 
@@ -1475,27 +1854,21 @@ sub _marc2html {
 # link checker to determine what URLs are broken.                  #
 ####################################################################
 sub _urls {
-    my $marc = shift;
+    my $marcrec = shift;
     my $args = shift;
     my $newline = $args->{'lineterm'} || "\n";
     my $output = "";
-    my @records;
-    if ($args->{'records'}) {@records=@{$args->{'records'}}}
-    else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
-    local $^W = 0;	# no warnings
-    foreach my $h (@records) {
-	my $i=$marc->[$h];
-	my $x=0;
-	my $controlnum=undef;
-	foreach my $j (@{$i->{'array'}}) {
-	    if ($j->[0] eq "001") {
-		$controlnum=$j->[1];
-	    }
-	    elsif ($j->[0] eq "856") {
-		for (my $k=1; $k< $#$j; $k++) {
-		    if ($j->[$k] eq "u") {
-			$output.=qq(<a href="$j->[$k+1]">$controlnum : $j->[$k+1]</a><br>$newline);
-		    }
+    
+    my $controlnum=undef;
+    foreach my $rfield (@{$marcrec->{'array'}}) {
+	if ($rfield->[0] eq "001") {
+	    $controlnum= $rfield->[1];
+	}
+	elsif ($rfield->[0] eq "856") {
+	    for (my $k=3; $k< $#$rfield; $k++) {
+		if ($rfield->[$k] eq "u") {
+		    $output.=qq{<a href="$rfield->[$k+1]">$controlnum :}.
+			qq{$rfield->[$k+1]</a><br>$newline};
 		}
 	    }
 	}
@@ -1506,338 +1879,380 @@ sub _urls {
 ####################################################################
 # isbd() attempts to create a quasi ISBD output format             #
 ####################################################################
-sub _isbd {
-    my $flag;
-    my $output;
-    my $marc=shift;
+sub _isbd { # rec
+    my $marcrec=shift;
     my $args=shift;
+
+    my $output = "";
     my $newline = $args->{'lineterm'} || "\n";
-    my @records;
-    if ($args->{'records'}) {@records=@{$args->{'records'}}}
-    else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
-    for my $i (@records) { #cycle through each record
-	my $record=$marc->[$i];
-	$output .= _joinfield($record->{'245'}{'field'}[0],"245");
-	if ($record->{'250'}{'field'}[0]) {
-	    $output .= " -- "._joinfield($record->{'250'}{'field'}[0],"250");
-	}
-	if ($record->{'260'}{'field'}[0]) {
-	    $output .= " -- "._joinfield($record->{'260'}{'field'}[0],"260");
-	}
-	if ($record->{'300'}{'field'}[0]) {
-	    $output .= " -- "._joinfield($record->{'300'}{'field'}[0],"300");
-	}
-	if ($record->{'440'}{'field'}) {
-	    $flag=1;
-	    $output .= " -- ";
-	    foreach my $field (@$record->{'440'}{'field'}) {
-		$output .= "("._joinfield($field,"440").") ";
-	    }
-	}
-	if ($record->{'490'}{'field'}) {
-	    unless ($flag) {$output .= " -- "}
-	    foreach my $field (@$record->{'490'}{'field'}) {
-		$output .= "("._joinfield($field,"490").") ";
-	    }
-	}
-	for (my $x=500; $x<600; $x++) {
-	    if ($record->{$x}) {
-		foreach my $field (@{$record->{$x}{'field'}}) {
-		    $output .= $newline._joinfield($field,$x);
-		}
-	    }
-	}
-	if ($record->{'020'}) {
-	    $output .= $newline._joinfield($record->{'020'}{'field'}[0]);
-	}
-	$flag = undef;
-	$output .= $newline.$newline;		
+
+    my @reporting_fields = grep {$_->[0] =~/020|245|250|260|300|440|490|5../}
+                               @{$marcrec->{'array'}}; # optimization.
+    my %tagfields = (); # This will allow random access to fields based on tags
+    foreach my $rfield (@reporting_fields) {
+	push @{$tagfields{$rfield->[0]}},$rfield;
     }
+    $output .= $marcrec->_joinfield($tagfields{245}[0],"245");
+    for (qw/250 260 300/) {
+	$output .= " -- ". $marcrec->_joinfield($tagfields{$_}[0],$_) if $tagfields{$_};
+    }
+    if ($tagfields{'440'}) {
+	$output .= " -- ";
+	foreach my $rfield (@{$tagfields{'440'}}) {
+	    $output .= "(".$marcrec->_joinfield($rfield,"440").") ";
+	}
+    }
+    if ($tagfields{'490'}) {
+	$output .= " -- " unless $tagfields{'440'};
+	foreach my $rfield (@{$tagfields{'490'}}) {
+	    $output .= "(".$marcrec->_joinfield($rfield,"490").") ";
+	}
+    }
+    my @f500s = grep {$_->[0] =~/5../} @reporting_fields;
+    foreach my $rfield (@f500s) {
+	$output .= $newline.$marcrec->_joinfield($rfield,$rfield->[0]);
+    }
+    if ($tagfields{'020'}) {
+	$output .= $newline.$marcrec->_joinfield($tagfields{'020'}[0]);
+    }
+    $output .= $newline.$newline;		
     return $output;
 }
 
 ####################################################################
-# createrecord() appends a new record to the MARC object           #
-# and initializes the '000' field                                  #
+
+# createrecord takes a string leader and returns a new record with
+# leader information at the appropriate place.
+
 ####################################################################
-sub createrecord {
-    my $marc=shift;
+sub createrecord { # rec
+    my $marcrec = shift;
     local $^W = 0;	# no warnings
-    my $params=shift;
-    my $leader=$params->{'leader'} || "00000nam  2200000 a 4500";
+    my $leader=shift || "00000nam  2200000 a 4500";
+    my $newrec = $marcrec->copy_struct();
        #default leader see MARC documentation http://lcweb.loc.gov/marc
-    my $number=$#$marc + 1;
-    push (@{$marc->[$number]{'000'}},('000',$leader)); #create map
-##93    push(@{$marc->[$number]{array}[0]},('000',\$leader)); #add tag and value
-    push(@{$marc->[$number]{'array'}},$marc->[$number]{'000'});
-    return $number;
+    my @ldrfield = ('000',$leader);
+    $newrec->field_updatehook(\@ldrfield);
+    push (@{$newrec->{'000'}},@ldrfield); #create map
+    push(@{$newrec->{'array'}},$newrec->{'000'});
+    return $newrec;
 }
 
 ####################################################################
-# addfield() appends/inserts a new field into an existing record   #
+# nextrec() will read in a record from a filehandle
+# already been opened with openmarc(). the increment can be        #
+# adjusted if necessary by passing a new value as a parameter. the # 
+# new records will be APPENDED to the MARC object                  #
+####################################################################
+sub nextrec {
+    my $marcrec=shift;
+    if (not($marcrec->{'handle'})) {
+	mycarp "There isn't a MARC file open"; 
+	return;
+    }
+    if ($marcrec->{'format'} =~ /usmarc/oi) {
+	return  _readmarc($marcrec);
+    }
+    elsif ($marcrec->{'format'} =~ /marcmaker/oi) {
+	return _readmarcmaker($marcrec);
+    }
+    else {return (undef,-3)}   
+}
+
 ####################################################################
 
-sub addfield {
-    my $marc=shift;
-    my $params=shift;
+# Add_map is the rec equivalent of MARC::add_map (as usual, without
+# the record number).
+
+####################################################################
+sub add_map { # rec
+    my $marcrec=shift;
+    my $rafield = shift;
+    my $tag = $rafield->[0];
+    return undef if $tag eq '000'; #currently handle ldr yourself...
+    my @tmp = @$rafield;
+    my $field_len = $#tmp;
+    my $record = $marcrec;
+    if ($tag > 10 ) {
+	my $i1 = $rafield->[1];
+	my $i2 = $rafield->[2];
+	my $i12 = $i1.$i2;
+
+	for(my $i=3;$i<$field_len;$i+=2) {
+	    my $subf_code = $rafield->[$i];
+	    push(@{$record->{$tag}{$subf_code}}, \$rafield->[$i+1]);
+	}
+	push(@{$record->{$tag}{'i1'}{$i1}},$rafield);
+	push(@{$record->{$tag}{'i2'}{$i2}},$rafield);
+	push(@{$record->{$tag}{'i12'}{$i12}},$rafield);
+    }
+    push(@{$record->{$tag}{field}},$rafield);
+}
+
+####################################################################
+
+# rebuild_map() is the ::Rec version of MARC::rebuild_map().
+
+####################################################################
+sub rebuild_map { # rec
+    my $marcrec=shift;
+    my $tag = shift;
+    return undef if $tag eq '000'; #currently ldr is different...
+    my @tagrefs = grep {$_->[0] eq $tag} @{$marcrec->{'array'}};
+    delete $marcrec->{$tag};
+    for (@tagrefs) {$marcrec->add_map($_)};
+}
+
+####################################################################
+
+# rebuild_map_all() is the ::Rec version of MARC::rebuild_map_all()
+
+####################################################################
+sub rebuild_map_all { # rec
+    my $marcrec=shift;
+    my %tags=();
+    map {$tags{$_->[0]}++} @{$marcrec->{'array'}};
+    foreach my $tag (keys %tags) {$marcrec->rebuild_map($tag)};
+}
+
+
+
+####################################################################
+
+# Reads the next record out of the handle. Returns a pair (new
+# record,status). Status is 1 in the generic case. Status is -1 if
+# lengths do not match -2 if leader size is not numeric, undef if at
+# the last record. New record is undef if there is an error or at the
+# last record.
+
+####################################################################
+sub _readmarc { # rec
+    my $marcrec = shift;
+    my $handle = $marcrec->{'handle'};
+    my $string = shift;
+    local $/ = "\035";	# cf. TPJ #14
     local $^W = 0;	# no warnings
-    my $record=$params->{'record'};
-    unless ($record) {mycarp "You must specify a record"; return}
-    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
-    my $field = $params->{'field'};
-    unless ($field) {mycarp "You must specify a field"; return}
-    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
-
-    my $i1=$params->{'i1'};
-    $i1 = ' ' unless (defined $i1);
-    my $i2=$params->{'i2'};
-    $i2 = ' ' unless (defined $i2);
-    my @value=$params->{'value'} || @_;
-    if (ref($params->{'value'}) eq "ARRAY") { @value = @{$params->{'value'}}; }
-    unless (defined $value[0]) {mycarp "No value specified"; return}
-
-    if ($field >= 10) {
-        if ($value[0] eq 'i1') {
-	    shift @value;
-	    $i1 = shift @value;
-        }
-        unless (1 == length($i1)) {
-	    mycarp "invalid \'i1\' specified";
-	    return;
-	}
-        if ($value[0] eq 'i2') {
-	    shift @value;
-	    $i2 = shift @value;
-        }
-        unless (1 == length($i2)) {
-	    mycarp "invalid \'i2\' specified";
-	    return;
-	}
+    my $line;
+    $line = $string if $string;
+    $line = <$handle> if $handle and !defined($string);
+    my $recordlength = substr($line,0,5);
+    my $octets = length ($line);
+    $line=~s/[\n\r\cZ]//og;
+    return (undef,undef) unless $line;
+    if ($recordlength =~ /\d{5}/o) {
+	print "recordlength = $recordlength, length = $octets\n"
+		if $MARC::DEBUG;
+	return  (undef,-1) unless $recordlength == $octets;
+    } else {
+	return  (undef,-2);
     }
+    my @d = ();
+    $line=~/^(.{24})([^\036]*)\036(.*)/o;
+    my $leader=$1; my $dir=$2; my $data=$3;
+    my $record = $marcrec->createrecord($leader);
 
-    my $ordered=$params->{'ordered'} || "y";
-    my $insertorder = $#{$marc->[$record]{array}} + 1;
-       #if necessary figure out the insert order to preserve tag order
-    if ($ordered=~/y/i) {
-	for (my $i=0; $i<=$#{$marc->[$record]{array}}; $i++) {
-	    if ($marc->[$record]{array}[$i][0] > $field) {
-		$insertorder=$i;
-		last;
+    @d=$dir=~/(.{12})/go;
+	for my $d(@d) {
+	    my @field=();
+	    my $tag=substr($d,0,3);
+	    chop(my $field=substr($data,substr($d,7,5),substr($d,3,4)));
+	    if ($tag<10) {
+		@field=($tag,$field);
 	    }
-	    if ($insertorder==0) {$insertorder=1}
-	}
-    }
-    my @field;
-    if ($field<10) {
-	push (@field, $field, $value[0]);
-	if ($ordered=~/y/i) {
-	    splice @{$marc->[$record]{array}},$insertorder,0,\@field; 
-	}
-	else {
-	    push (@{$marc->[$record]{array}},\@field);
-	}
-#	push (@{$marc->[$record]{$field}{field}},\@field); 
-    }
-    else {
-	push (@field, $field, $i1, $i2);
-	my ($sub_id, $subfield);
-	while ($sub_id = shift @value) {
-	    last if ($sub_id eq "\036");
-	    $subfield = shift @value;
-	    push (@field, $sub_id, $subfield);
-#	    push (@{$marc->[$record]{$field}{$sub_id}}, \$field[$#field]);
-	}
-	if ($ordered=~/y/i) {
-	    splice @{$marc->[$record]{array}},$insertorder,0,\@field;
-	}
-	else {
-	    push (@{$marc->[$record]{array}},\@field);
-	}
-#	push (@{$marc->[$record]{$field}{field}},\@field);
-#	push (@{$marc->[$record]{$field}{i1}{$i1}},\@field);
-#	push (@{$marc->[$record]{$field}{i2}{$i2}},\@field);
-#	push (@{$marc->[$record]{$field}{i12}{"$i1$i2"}},\@field);
-    }
-    $marc->add_map($record,\@field);
-}
-####################################################################
-
-# getfields() takes a template and returns an array of fieldrefs from
-# $marc->[$recnum]{'array'} including all with the appropriate tag
-# and having the property that they are a contiguous group. (So may
-# include fields with other tags.)
-
-####################################################################
-sub getfields {
-    my @output;
-    my $marc=shift;
-    my $params=shift;
-    my $record=$params->{'record'};
-    unless ($record) {mycarp "You must specify a record"; return}
-    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
-    my $field = $params->{'field'};
-    unless ($field) {mycarp "You must specify a field"; return}
-    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
-#    return grep { $_->[0] eq $field }   @{$marc->[$record]{'array'}};
-    my @ans=();
-    my $first = undef;
-    my $last = $first; 
-    my $pos = 0;
-    for (@{$marc->[$record]{'array'}}) {
-	$first = $pos if ($_->[0] eq $field && !defined($first)) ;
-	$last = $pos if $_->[0] eq $field;
-	$pos++;
-    }
-    return () unless defined($first);
-    return @{$marc->[$record]{'array'}}[$first..$last]; # array slice. Look it up.
+	    else {
+		my ($indi1, $indi2, $field_data) = unpack ("a1a1a*", $field);
+		
+		push (@field, $tag, $indi1, $indi2);
+		
+		my @subfields = split(/\037/,$field_data);
+		foreach (@subfields) {
+		    my $delim = substr($_,0,1);
+		    next unless $delim;
+		    my $subfield_data = substr($_,1);
+		    push(@field, $delim, $subfield_data);
+		    
+		} #end parsing subfields
+	    } #end testing tag number
+	    push(@{$record->{'array'}},\@field);
+	    $record-> add_map(\@field);
+	} #end processing this field
+    return ($record,1);
 }
 
-####################################################################
-# getupdate() returns an array of key,value pairs formatted to     #
-# pass to addfield(). For repeated tags, a "\036" element is used  #
-# to delimit data for separate addfield() commands                 #
-####################################################################
-sub getupdate {
-    my @output;
-    my $marc=shift;
-    my $params=shift;
-    my $record=$params->{'record'};
-    unless ($record) {mycarp "You must specify a record"; return}
-    if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
-    my $field = $params->{'field'};
-    unless ($field) {mycarp "You must specify a field"; return}
-    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
+###################################################################
+# readmarcmaker() reads a marcmaker file into the MARC object     #
+###################################################################
+sub _readmarcmaker { # rec
+    my $marcrec = shift;
+    my $handle = $marcrec->{'handle'};
+    my $string = shift;
+    my $record;
 
-    foreach my $fields (@{$marc->[$record]{array}}) { #cycle each field 
-	next unless ($field eq $fields->[0]);
-	if ($field<10) {
-	    push @output,$fields->[1];
-	}
-	else {
-	    push @output,'i1',$fields->[1],'i2',$fields->[2];
-	    my @subfields = @{$fields}[3..$#{$fields}];		
-	    while (@subfields) { #cycle through subfields incl. refs
-		my $subfield = shift @subfields;
-		last unless defined $subfield;
-		if (ref($subfield) eq "ARRAY") {
-		    foreach my $subsub (@{$subfield}) {
-		        push @output, $subsub;
-		    }
-		}
-		else {
-		    push @output, $subfield;
-		}
-	    } #finish cycling through subfields
-	} #finish tag test < 10
-	push @output,"\036";		
+    unless (exists $marcrec->{'makerchar'}) {
+        $marcrec->{'makerchar'} = usmarc_default();	# hash ref
     }
-    return @output;
-}
-#################################################################### 
+    my $charset = $marcrec->{makerchar};
+    my $lineterm = $marcrec->{'lineterm'} || "\015\012";
+	# MS-DOS file default for MARCMaker
 
-# deletefirst() takes a template and a boolean $do_rebuild_map to
-# rebuild the map. It deletes the field data for a first match, using
-# the template and leaves the rest alone. If the template has a
-# subfield element it deletes based on the subfield information in the
-# template. If the last subfield of a field is deleted, deletefirst()
-# also deletes the field.  It complains about attempts to delete
-# indicators.  If there is no match, it does nothing. Deletefirst also
-# rebuilds the map if $do_rebuild_map. Deletefirst returns the number
-# of matches deleted (that would be 0 or 1), or undef if it feels
-# grumpy (i.e. carps).
+      #Set the file input separator to "\r\n\r\n", which is the same as 
+      #a blank line. A single blank line separates individual MARC records
+      #in the MARCMakr format.
+    local $/ = "$lineterm$lineterm";	# cf. TPJ #14
+    local $^W = 0;	# no warnings
+    $record = $string if $string;
+    $record = <$handle> if $handle and !defined($string);
 
-####################################################################
-
-sub deletefirst {
-    my $marc = shift || return;
-    my $template = shift;
-    return unless (ref($template) eq "HASH");
-    return if (defined $template->{'value'});
-
-    my $field = $template->{'field'};
-    my $recnum = $template->{'record'};
-    my $subfield = $template->{'subfield'};
-    my $do_rebuild_map = $template->{'rebuild_map'};
-    if (!$recnum) {mycarp "Need a record to confine my destructive tendencies"; return undef}
-    if (defined($subfield) and $subfield =~/^i[12]$/) {mycarp "Cannot delete indicators"; return undef}
-#I know that $marc->[$recnum]{$field}{field} is this information
-#But I don't want to depend on the map being up-to-date allways.
-    my @fieldrefs = grep {$_->[0] eq $field} @{$marc->[$recnum]{'array'}};
-
-    return 0 unless scalar(@fieldrefs);
+    return (undef,undef) unless $record;
+    #Split each record on the "\n=" into the @fields array
+    my @lines=split "$lineterm=",$record;
+    my $leader = shift @lines;
+    unless ($leader =~ /^=LDR  /o) {
+	return (undef, -1);
+    }
     
-    if ($field and not($subfield)) {
-	shift @fieldrefs;
-	$marc->updatefields($template,\@fieldrefs);
-	$marc->rebuild_map($recnum,$field) if $do_rebuild_map;
-	return 1;
-    }
-
-
-    #Linear search for the field where deletion happens and the position 
-    #in that field.
-    my $rvictim=0;
-    my $fieldnum = 0;
-    foreach my $fieldref (@fieldrefs) {
-	if ($marc->getmatch($subfield,$fieldref)){
-	    $rvictim=$fieldref;
-	    last;
+    $leader=~s/^=LDR  //o;	#Remove "=LDR  "
+    $leader=~s/[\n\r]//og;
+    $leader=~s/\\/ /go;	# substitute " " for \
+    my $rec = $marcrec->createrecord($leader);
+    foreach my $line (@lines) {
+	#Remove newlines from @fields ; and also substitute " " for \
+	$line=~s/[\n\r]//og;
+	$line=~s/\\/ /go;
+	#get the tag name
+	my $tag = substr($line,0,3);
+	my @field=(); #this will be added to $marcrec and the map updated.
+	#if the tag is less than 010 (has no indicators or subfields)
+	#then push the data into @$field
+	if ($tag < 10) {
+	    my $value = _maker2char (substr($line,5), $charset);
+	    @field=($tag,$value);
 	}
-	$fieldnum++;
-    }
-    if (!$rvictim) {
-	$marc->rebuild_map($recnum,$field) if $do_rebuild_map;
-	return 0;
-    }
+	else {
+	    #elseif the tag is greater than 010 (has indicators and 
+	    #subfields then add the data to the $marc object
+	    my $field_data=substr($line,7);
+	    my $i1=substr($line,5,1);
+	    my $i2=substr($line,6,1);
+	    @field = ($tag,$i1,$i2);
+	    
+	    my @subfields=split /\$/, $field_data; #get the subfields
+	    foreach my $subfield (@subfields) {
+		my $delim=substr($subfield,0,1); #extract subfield delimiter
+		next unless $delim;
+		my $subfield_data= MARC::_maker2char (substr($subfield,1),
+						      $charset);
+		#extract subfield value
+		push (@field, $delim, $subfield_data);
+	    } #end parsing subfields
+	} #end tag>10
+	print "DEBUG: tag = $tag\n" if $MARC::DEBUG;
+	push @{$rec->{'array'}},\@field;
+	$rec -> add_map(\@field);
+    } #end reading this line
+    return ($rec,1);
+} #end reading this record
 
-    #Now we know that we have a field and subfield with a match.
-    #Find the first one and kill it. Kill the enclosing field 
-    #if it is the last one.
-    $marc->deletesubfield($subfield,$rvictim);
-    $marc->field_updatehook($rvictim);
-    if ($marc->field_is_empty($rvictim)) {
-	splice @fieldrefs,$fieldnum,1;
-	$marc->updatefields($template,\@fieldrefs);
+sub _maker2char { # rec
+    my $marc_string = shift;
+    my $charmap = shift;
+    while ($marc_string =~ /{(\w{1,8}?)}/o) {
+	if (exists ${$charmap}{$1}) {
+	    $marc_string = join ('', $`, ${$charmap}{$1}, $');
+	}
+	else {
+	    $marc_string = join ('', $`, '&', $1, ';', $');
+	}
     }
-    #here we don't need to directly touch $marc->[$recnum]{array}
-    # since we are not changing its structure.
-    $marc->rebuild_map($recnum,$field) if $do_rebuild_map;
-    return 1;
+       # closing curly brace - part 2, permits {lcub}text{rcub} in input
+    $marc_string =~ s/\&rcub;/\x7d/go;
+    return $marc_string;
 }
 
-#################################################################### 
+sub usmarc_default { # rec
+    my @hexchar = (0x00..0x1a,0x1c,0x7f..0x8c,0x8f..0xa0,0xaf,0xbb,
+		   0xbe,0xbf,0xc7..0xdf,0xfc,0xfd,0xff);
+    my %inchar = map {sprintf ("%2.2X",int $_), chr($_)} @hexchar;
 
-# field_is_empty takes a ref to an array formatted like
-# an element of $marc->[$recnum]{array}. It returns 1 if there are
-# no "significant" elements of the array (e.g. nothing but indicators
-# if $tag>10), else 0. Override this if you want to delete fields
-# that have "insignificant" subfields inside deletefirst.
-
-####################################################################
-sub field_is_empty {
-    my ($marc,$rfield) = @_;
-    my $tag = $rfield->[0];
-    my @field = @$rfield;
-    return 1 if ($tag > 10 and !defined($field[3]));
-    return 1 if ($tag < 10 and !defined($field[1]) );
-    return 0;
-}
-
-#################################################################### 
-
-# field_updatehook takes a ref to an array formatted like
-# $marc->[$recnum]{'array'}. It is there so that
-# subclasses can override it to do something before calling
-# addfield(), e.g.  store field-specific information in the affected
-# field or log information in an external file/database. One notes that
-# since this is a method, it can ignore its arguments and log global
-# information about $marc, e.g. order information in $marc->[$rnum]{'array'}
-
-####################################################################
-
-sub field_updatehook {
-    my ($marc,$rfield)=@_;
-    #Do nothing. subclasses problem.
+    $inchar{esc} = chr(0x1b);		# escape
+    $inchar{dollar} = chr(0x24);	# dollar sign
+    $inchar{curren} = chr(0x24);	# dollar sign - alternate
+    $inchar{24} = chr(0x24);		# dollar sign - alternate
+    $inchar{bsol} = chr(0x5c);		# back slash (reverse solidus)
+    $inchar{lcub} = chr(0x7b);		# opening curly brace
+    $inchar{rcub} = "&rcub;";		# closing curly brace - part 1
+    $inchar{joiner} = chr(0x8d);	# zero width joiner
+    $inchar{nonjoin} = chr(0x8e);	# zero width non-joiner
+    $inchar{Lstrok} = chr(0xa1);	# latin capital letter l with stroke
+    $inchar{Ostrok} = chr(0xa2);	# latin capital letter o with stroke
+    $inchar{Dstrok} = chr(0xa3);	# latin capital letter d with stroke
+    $inchar{THORN} = chr(0xa4);		# latin capital letter thorn (icelandic)
+    $inchar{AElig} = chr(0xa5);		# latin capital letter AE
+    $inchar{OElig} = chr(0xa6);		# latin capital letter OE
+    $inchar{softsign} = chr(0xa7);	# modifier letter soft sign
+    $inchar{middot} = chr(0xa8);	# middle dot
+    $inchar{flat} = chr(0xa9);		# musical flat sign
+    $inchar{reg} = chr(0xaa);		# registered sign
+    $inchar{plusmn} = chr(0xab);	# plus-minus sign
+    $inchar{Ohorn} = chr(0xac);		# latin capital letter o with horn
+    $inchar{Uhorn} = chr(0xad);		# latin capital letter u with horn
+    $inchar{mlrhring} = chr(0xae);	# modifier letter right half ring (alif)
+    $inchar{mllhring} = chr(0xb0);	# modifier letter left half ring (ayn)
+    $inchar{lstrok} = chr(0xb1);	# latin small letter l with stroke
+    $inchar{ostrok} = chr(0xb2);	# latin small letter o with stroke
+    $inchar{dstrok} = chr(0xb3);	# latin small letter d with stroke
+    $inchar{thorn} = chr(0xb4);		# latin small letter thorn (icelandic)
+    $inchar{aelig} = chr(0xb5);		# latin small letter ae
+    $inchar{oelig} = chr(0xb6);		# latin small letter oe
+    $inchar{hardsign} = chr(0xb7);	# modifier letter hard sign
+    $inchar{inodot} = chr(0xb8);	# latin small letter dotless i
+    $inchar{pound} = chr(0xb9);		# pound sign
+    $inchar{eth} = chr(0xba);		# latin small letter eth
+    $inchar{ohorn} = chr(0xbc);		# latin small letter o with horn
+    $inchar{uhorn} = chr(0xbd);		# latin small letter u with horn
+    $inchar{deg} = chr(0xc0);		# degree sign
+    $inchar{scriptl} = chr(0xc1);	# latin small letter script l
+    $inchar{phono} = chr(0xc2);		# sound recording copyright
+    $inchar{copy} = chr(0xc3);		# copyright sign
+    $inchar{sharp} = chr(0xc4);		# sharp
+    $inchar{iquest} = chr(0xc5);	# inverted question mark
+    $inchar{iexcl} = chr(0xc6);		# inverted exclamation mark
+    $inchar{hooka} = chr(0xe0);		# combining hook above
+    $inchar{grave} = chr(0xe1);		# combining grave
+    $inchar{acute} = chr(0xe2);		# combining acute
+    $inchar{circ} = chr(0xe3);		# combining circumflex
+    $inchar{tilde} = chr(0xe4);		# combining tilde
+    $inchar{macr} = chr(0xe5);		# combining macron
+    $inchar{breve} = chr(0xe6);		# combining breve
+    $inchar{dot} = chr(0xe7);		# combining dot above
+    $inchar{diaer} = chr(0xe8);		# combining diaeresis
+    $inchar{uml} = chr(0xe8);		# combining umlaut
+    $inchar{caron} = chr(0xe9);		# combining hacek
+    $inchar{ring} = chr(0xea);		# combining ring above
+    $inchar{llig} = chr(0xeb);		# combining ligature left half
+    $inchar{rlig} = chr(0xec);		# combining ligature right half
+    $inchar{rcommaa} = chr(0xed);	# combining comma above right
+    $inchar{dblac} = chr(0xee);		# combining double acute
+    $inchar{candra} = chr(0xef);	# combining candrabindu
+    $inchar{cedil} = chr(0xf0);		# combining cedilla
+    $inchar{ogon} = chr(0xf1);		# combining ogonek
+    $inchar{dotb} = chr(0xf2);		# combining dot below
+    $inchar{dbldotb} = chr(0xf3);	# combining double dot below
+    $inchar{ringb} = chr(0xf4);		# combining ring below
+    $inchar{dblunder} = chr(0xf5);	# combining double underscore
+    $inchar{under} = chr(0xf6);		# combining underscore
+    $inchar{commab} = chr(0xf7);	# combining comma below
+    $inchar{rcedil} = chr(0xf8);	# combining right cedilla
+    $inchar{breveb} = chr(0xf9);	# combining breve below
+    $inchar{ldbltil} = chr(0xfa);	# combining double tilde left half
+    $inchar{rdbltil} = chr(0xfb);	# combining double tilde right half
+    $inchar{commaa} = chr(0xfe);	# combining comma above
+    if ($MARC::DEBUG) {
+        foreach my $str (sort keys %inchar) {
+            printf "%s = %x\n", $str, ord($inchar{$str});
+        }
+    }
+    return \%inchar;
 }
 
 #################################################################### 
@@ -1854,8 +2269,8 @@ sub field_updatehook {
 
 ####################################################################
 
-sub updatefirst {
-    my $marc = shift || return;
+sub updatefirst { # rec
+    my $marcrec = shift || return;
     my $template = shift;
     return unless (ref($template) eq "HASH");
     return unless (@_);
@@ -1864,17 +2279,15 @@ sub updatefirst {
 
     my @ufield = @_;
     my $field = $template->{'field'};
-    my $recnum = $template->{'record'};
     my $subfield = $template->{'subfield'};
     my $do_rebuild_map = $template->{'rebuild_map'};
 
     $ufield[0]= $field;
     my $ufield_lt_10_value = $ufield[1];
-    my $ftemplate = {record=>$recnum,field=>$field};
-    if (!$recnum) {mycarp "Need a record to confine my changing needs."; return undef}
+    my $ftemplate = {field=>$field};
     if (!$field) {mycarp "Need a field to configure my changing needs."; return undef}
 
-    my @fieldrefs = grep {$_->[0] eq $field} @{$marc->[$recnum]{'array'}};
+    my @fieldrefs = $marcrec->getfields($template);
 
 # An invariant is that at most one element of @fieldrefs is affected.
     if ($field and not($subfield)) {
@@ -1887,24 +2300,22 @@ sub updatefirst {
 	$ufield[1]=$i1; 
 	$ufield[2]=$i2;
 	if ($field <10) {@ufield = ($field,$ufield_lt_10_value)}
-	my $rafieldrefs;
+	my $rafieldrefs = \@fieldrefs;
+	$marcrec->field_updatehook(\@ufield);
 	$rafieldrefs->[0] = \@ufield;
 	if (!scalar(@fieldrefs)) {
-	    $marc->updatefields($template,$rafieldrefs);		
+	    $marcrec->updatefields($template,$rafieldrefs);		
 	    return;
 	}
 	$fieldrefs[0]=\@ufield;
 #There is no issue with $fieldrefs being taken over by the splice in updatefields.
 # in current testing. Perl may change its behavior later...
-	$marc->updatefields($template,\@fieldrefs);
+	$marcrec->updatefields($template,\@fieldrefs);
 	return;
-#	my @newfield = $marc->upd_flatten(@fieldrefs);
-#	return $marc->addfield($ftemplate,@newfield) unless scalar(@fieldinfo);
-#	return $marc->updaterecord($ftemplate,@newfield);
     } #end field.
 # The case of adding first subfields is hard.  (Not too bad with
 # indicators since every non-control field has them.)
-# OK, we have recnum, field, and subfield. 
+# OK, we have  field, and subfield. 
 	if ($field and $subfield) {
 	    if ($field <10) {croak "Cannot update subfields of control fields"; return undef}
 
@@ -1912,7 +2323,7 @@ sub updatefirst {
 	    my $fieldnum = 0;
 	    my $rval = 0;
 	    foreach my $fieldref (@fieldrefs) {
-		$rval = $marc->getmatch($subfield,$fieldref);
+		$rval = $marcrec->getmatch($subfield,$fieldref);
 		if ($rval){
 		    $rvictim=$fieldref;
 		    last;
@@ -1947,29 +2358,30 @@ sub updatefirst {
 	    if (!scalar(@fieldrefs)) {
 		my @newfield = ($field, ' ',' ', $subfield =>$usub);
 		my $rafields;
+		$marcrec->field_updatehook(\@newfield);
 		$rafields->[0] = \@newfield;
-		return $marc->updatefields($template,$rafields);
+		return $marcrec->updatefields($template,$rafields);
 	    }
 	    #The general insert case.
 	    if (!$rvictim and scalar(@fieldrefs)) {
 		$rvictim = $fieldrefs[0];
-		$marc->insertpos($subfield,$usub,$rvictim);
-		$marc->field_updatehook($rvictim);
-		$marc->rebuild_map($recnum,$field) if $do_rebuild_map;
+		$marcrec->insertpos($subfield,$usub,$rvictim);
+		$marcrec->field_updatehook($rvictim);
+		$marcrec->rebuild_map($field) if $do_rebuild_map;
 		return 1; # $rvictim is now defined, so can't depend on future
 		          # control logic. 
 	    }
 	    #The general replace case.
 	    if ($rvictim) {
 		$$rval = $usub;
-		$marc->field_updatehook($rvictim);
+		$marcrec->field_updatehook($rvictim);
 
 		# The following line is unecessary for this class:
 		# everything updates due to hard-coded ref
 		# relationships in the index.  Left so that subclasses
 		# can do their thing with less over-ruling.
 
-		$marc->rebuild_map($recnum,$field) if $do_rebuild_map; 
+		$marcrec->rebuild_map($field) if $do_rebuild_map; 
 		return 1;
 		}
 	} #end $field and $subfield
@@ -1977,7 +2389,7 @@ sub updatefirst {
 
 ####################################################################
 
-# updatefields() takes a template which specifies recnum, a
+# updatefields() takes a template which specifies a
 # $do_rebuild_map and a field (needs the field in case $rafields->[0]
 # is empty). It also takes a ref to an array of fieldrefs formatted
 # like the output of getfields(), and replaces/creates the field
@@ -1985,10 +2397,10 @@ sub updatefirst {
 # in the fieldrefs. It calls rebuild_map() if $do_rebuild_map.
 
 ####################################################################
-sub updatefields {
-    my $marc = shift || return;
+sub updatefields { # rec
+    my $marcrec = shift || return;
     my $template = shift;
-    my $recnum = $template->{'record'};
+
     my $do_rebuild_map = $template->{'rebuild_map'};
     my $tag = $template->{'field'};
     my $rafieldrefs = shift;
@@ -2000,7 +2412,7 @@ sub updatefields {
     my $last = $first; # Should be "Let the first be last". Misbegotten Perl syntax.
     my $firstpast = undef;
     my $len = 0;
-    my @mfields = @{$marc->[$recnum]{'array'}};
+    my @mfields = @{$marcrec->{'array'}};
     my $insertpos = undef;
     for (@mfields) {
 	$first = $pos if ($_->[0] eq $tag and !defined($first)) ;
@@ -2012,8 +2424,117 @@ sub updatefields {
     $insertpos = scalar(@mfields) if !defined($firstpast);
     $insertpos = $first if (defined($first));
     $insertpos = $firstpast unless $insertpos;
-    splice @{$marc->[$recnum]{'array'}},$insertpos,$len,@fieldrefs;
-    $marc->rebuild_map($recnum,$tag) if $do_rebuild_map;
+    splice @{$marcrec->{'array'}},$insertpos,$len,@fieldrefs;
+    $marcrec->rebuild_map($tag) if $do_rebuild_map;
+}
+
+####################################################################
+# output() will call the appropriate output method using the marc  #
+# object and desired format parameters.                            # 
+####################################################################
+sub output {
+    my $marcrec=shift;
+    my $args=shift;
+    my $output = "";
+    my $newline = $args->{'lineterm'} || "\n";
+
+    $marcrec->add_005($args) if ($args->{'file'} or $args->{'add_005s'});
+
+    unless (exists $args->{'format'}) {
+	    # everything to string
+        $args->{'format'} = "usmarc";
+        $args->{'lineterm'} = $newline;
+    }
+    if ($args->{'format'} =~ /marc$/oi) {
+	$output = _writemarc($marcrec,$args);
+    }
+    elsif ($args->{'format'} =~ /marcmaker$/oi) {
+	$output = _marcmaker($marcrec,$args);
+    }
+    elsif ($args->{'format'} =~ /ascii$/oi) {
+	$output = _marc2ascii($marcrec,$args);
+    }
+    elsif ($args->{'format'} =~ /html$/oi) {
+	$output .= _marc2html($marcrec,$args);
+    }
+    elsif ($args->{'format'} =~ /html_header$/oi) {
+	$output = "Content-type: text/html\015\012\015\012";
+    }
+    elsif ($args->{'format'} =~ /html_start$/oi) {
+	if ($args->{'title'}) {
+            $output = "<html><head><title>$args->{'title'}</title></head>";
+	    $output .= "$newline<body>";
+	}
+	else {
+	    $output = "<html><body>";
+	}
+    }
+    elsif ($args->{'format'} =~ /html_body$/oi) {
+        $output =_marc2html($marcrec,$args);
+    }
+    elsif ($args->{'format'} =~ /html_footer$/oi) {
+	$output = "$newline</body></html>$newline";
+    }
+    elsif ($args->{'format'} =~ /urls$/oi) {
+	$output .= _urls($marcrec,$args);
+    }
+    elsif ($args->{'format'} =~ /isbd$/oi) {
+	$output = _isbd($marcrec,$args);
+    }
+    elsif ($args->{'format'} =~ /xml/oi) {
+	mycarp "XML formats are now handled by MARC::XML" if ($^W);
+	return;
+    }
+    if ($args->{'file'}) {
+	if ($args->{'file'} !~ /^>/) {
+	    mycarp "Don't forget to use > or >> with output file name";
+	    return;
+	}
+	open (OUT, $args->{file}) || mycarp "Couldn't open file: $!";
+	#above quote is bad if {file} is tainted. Is probably unecessary.dgl.
+        binmode OUT;
+	print OUT $output;
+	close OUT || mycarp "Couldn't close file: $!";
+	return 1;
+    }
+      #if no filename was specified return the output so it can be grabbed
+    else {
+	return $output;
+    }
+}
+
+####################################################################
+
+# add_005s takes a template and adds current 005s to the elements of
+# $marc mentioned in $template->{records}
+
+####################################################################
+sub add_005 {
+    my $marcrec=shift;
+    my $time = shift;
+    my @m005 = ('005', $time );
+    $marcrec->updatefirst({field=>'005'},@m005);
+}
+
+##############################################################
+sub _joinfield { # rec
+    my $marcrec=shift;
+    my ($rfield,$field,$delim)=@_;
+    my $result;
+    return $rfield->[1] if $field<10;
+
+    if ($delim) {
+	foreach (my $i=3; $i<$#$rfield; $i+=2) {
+	    $result.=$delim.$rfield->[$i].$rfield->[$i+1];
+	}
+	return $result;
+    }
+
+    for (my $i=4; $i<=$#$rfield; $i=$i+2) {
+	$result.=$rfield->[$i];
+	$result.=" " unless $result=~/ $/;
+    }
+    return $result;
 }
 
 ####################################################################
@@ -2022,8 +2543,8 @@ sub updatefields {
 # Returns 0 or a ref to the value to be updated.
 
 ####################################################################
-sub getmatch {
-    my $marc = shift || return;
+sub getmatch { # rec
+    my $marcrec = shift || return;
     my $subf = shift;
     my $rfield = shift;
     my $tag = $rfield->[0];
@@ -2036,6 +2557,7 @@ sub getmatch {
     }
     return 0;
 }
+
 ####################################################################
 
 # deletesubfield() takes a subfield code (can not be an indicator) and a
@@ -2044,8 +2566,8 @@ sub getmatch {
 # subfield match in $fieldref.
 
 ####################################################################
-sub deletesubfield {
-    my $marc = shift || return;
+sub deletesubfield { # rec
+    my $marcrec = shift || return;
     my $subf = shift;
     my $rfield = shift;
     my $tag = $rfield->[0];
@@ -2068,8 +2590,8 @@ sub deletesubfield {
 # subfield match in $fieldref.
 
 ####################################################################
-sub insertpos {
-    my $marc = shift || return;
+sub insertpos { # rec
+    my $marcrec = shift || return;
     my $subf = shift;
     my $value = shift;
     my $rfield = shift;
@@ -2083,49 +2605,338 @@ sub insertpos {
     }
     splice @$rfield,$i,0,$subf,$value;
 }
-    
 
 ####################################################################
-# updaterecord() takes an array of key/value pairs, formatted like #
-# the output of getupdate(), and replaces/creates the field data.  #
-# For repeated tags, a "\036" element is used to delimit data into #
-# separate addfield() commands.                                    #
+
+# getfirstvalue() will return the first value of a field or subfield
+# or indicator or i12 in a particular record found in the MARC
+# object. It does not depend on the index being up to date.
+
 ####################################################################
-sub updaterecord {
-    my $marc = shift || return;
-    my $template = shift;
+sub getfirstvalue { # rec
+    my $marcrec= shift;
+    my $template=shift;
     return unless (ref($template) eq "HASH");
-    return unless (@_);
-    return if (defined $template->{'value'});
-    my $count = 0;
-    my @records = ();
-    unless ($marc->deletemarc($template)) {mycarp "not deleted\n"; return;}
-    foreach my $y1 (@_) {
-        unless ($y1 eq "\036") {
-    	    push @records, $y1;
-	    next;
-        }
-        unless ($marc->addfield($template, @records)) {
-	    mycarp "not added\n";
-	    return;
+    my $field  = $template->{'field'};
+    my $delim  = $template->{'delimiter'};
+    my $subfield;
+    $subfield = $template->{'subfield'} if $template->{'subfield'};
+    
+    if (not($field)) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
+    my @fieldrefs = grep {$_->[0] eq $field} @{$marcrec->{'array'}};
+    return unless @fieldrefs;
+    if ($field and not $subfield) {
+	return $marcrec->_joinfield($fieldrefs[0],$field,$delim);
+    } elsif ($field and $subfield) {
+	if ($field <10) {mycarp "There are no subfields or indicators for control fields";return}
+	return $fieldrefs[0][1].$fieldrefs[0][2] if $subfield eq 'i12';
+	my $rsubf = undef;
+	foreach my $fieldref (@fieldrefs) {
+	    $rsubf =$marcrec->getmatch($subfield,$fieldref);
+	    return $$rsubf if $rsubf;
 	}
-        @records = ();
-	$count++;
+	return undef unless $rsubf;
     }
-    return $count;
+}
+####################################################################
+# getvalue() will return the value of a field or subfield in a     #
+# particular record found in the MARC object                       #
+####################################################################
+sub getvalue { # rec
+    my $marcrec = shift;
+    my $template=shift;
+    return unless (ref($template) eq "HASH");
+    my $params = _params($template,@_);
+
+    my $field = $params->{field};
+    if (not($field)) {mycarp "You must specify a field"; return}
+    unless ($field =~ /^\d{3}$/) {mycarp "Invalid field specified"; return}
+    my $subfield = $params->{subfield};
+    my $delim = $params->{delimiter};
+    my @values;
+    if ($field and not($subfield)) {
+	return unless exists $marcrec->{$field};
+	if ($field eq '000') { return $marcrec->{'000'}[1] };
+	foreach my $rfield (@{$marcrec->{$field}{field}}) {
+	    push @values, 
+	    $marcrec->_joinfield($rfield,$field,$delim);
+	}
+	return @values;
+    }
+    elsif ($field and $subfield) {
+	return unless exists $marcrec->{$field};
+	return unless exists $marcrec->{$field}{$subfield};
+	if ($subfield eq "i1" || $subfield eq "i2" || $subfield eq "i12") {
+	    my @shortone = @{$marcrec->{$field}{field}};
+	    foreach my $rfield (@shortone) {
+		if ($subfield eq 'i1') {
+	            push @values, $rfield->[1];
+		}
+		elsif ($subfield eq 'i2') {
+	            push @values, $rfield->[2];
+		}
+		else {
+	            push @values, $rfield->[1].$rfield->[2];
+		}
+	    }
+	    return @values;
+	}
+	foreach my $rval (@{$marcrec->{$field}{$subfield}}) {
+	    push @values, $$rval;
+	}
+	return @values;
+    }
 }
 
 ####################################################################
-# _offset is an internal subroutine used by writemarc to offset    #
-# number ie. making "34" into "00034".                             #
-#################################################################### 
-sub _offset{
-    my $value=shift;
-    my $digits=shift;
-    print "DEBUG: _offset value = $value, digits = $digits\n" if ($DEBUG);
-    my $x=length($value);
-    $x=$digits-$x;
-    $x="0"x$x."$value";
+#Returns LDR at $record.                                           #
+####################################################################
+sub ldr { # rec
+    my $marcrec = shift;
+    return $marcrec->{array}[0][1];
+}
+
+
+####################################################################
+#Takes a record number and returns a hash of fields.               #
+#Needed to determine the format (BOOK, VIS, etc) of                #
+#the record.                                                       #
+#Folk also like to know what Ctrl, Desc etc are.                   #
+####################################################################
+sub unpack_ldr { # rec
+    my $marcrec = shift;
+
+    my $ldr = $marcrec->ldr();
+    my $rhldr = $marcrec->_unpack_ldr($ldr);
+    $marcrec->{unp_ldr}=$rhldr;
+    return $rhldr;
+}
+
+    
+sub _unpack_ldr { # rec
+    my ($marcrec,$ldr) = @_;
+
+    my %ans=();
+
+    my @fields=unpack($LDR_TEMPLATE,$ldr);
+    for (@LDR_FIELDS) {
+	$ans{$_}=shift @fields;
+    }
+    return \%ans;
+}
+
+
+####################################################################
+#Takes a record number.                                            #
+#Returns the unpacked ldr as a ref to hash from the ref in $self.  #
+#Does not overwrite hash from ldr.                                 #
+####################################################################
+sub get_hash_ldr { # rec
+    my $marcrec = shift;
+    return undef unless exists($marcrec->{unp_ldr});
+    return $marcrec->{unp_ldr};
+}
+
+####################################################################
+# Takes a record number and updates the corresponding ldr if there
+# is a hashed form. Returns undef unless there is a hash. Else
+# returns $ldr.
+####################################################################
+sub pack_ldr { # rec
+    my $marcrec = shift;
+    return undef unless exists($marcrec->{unp_ldr});
+    my $rhldr = $marcrec->{unp_ldr};
+    my $ldr = $marcrec -> _pack_ldr($rhldr);
+    $marcrec->{array}[0][1] = $ldr;
+    return $ldr;
+}
+
+####################################################################
+#Takes a ref to hash version of the LDR and returns a string       #
+# version                                                          #
+####################################################################
+sub _pack_ldr { # rec
+
+    my ($marcrec,$rhldr) = @_;
+    my @fields=();
+
+    for (@LDR_FIELDS) {
+	push @fields,$rhldr->{$_};
+    }
+    my $ans = pack($LDR_TEMPLATE,@fields);
+    return $ans;
+}
+
+####################################################################
+#Takes a string record number.                                     #
+#Returns a the format necessary to pack/unpack 008 fields correctly#
+####################################################################
+sub bib_format { # rec
+    my ($marcrec)=@_;
+    $marcrec->pack_ldr();
+    my $ldr = $marcrec->ldr();
+    return $marcrec->_bib_format($ldr);
+}
+
+sub _bib_format { # rec
+    my ($marcrec,$ldr)=@_;
+    my $rldr=$marcrec->_unpack_ldr($ldr);
+    my ($type,$bib_lvl) = ($rldr->{'Type'},$rldr->{'BLvl'});
+    return "UNKNOWN (Type $type Bib_Lvl $bib_lvl)" unless ($type=~/[abcdefgijkmprot]/ &&
+							   (($bib_lvl eq "") or 
+							    $bib_lvl=~/[abcdms]/)
+							   );
+
+    return "BOOKS" if (
+		       (
+			($type eq "a") && !($bib_lvl =~/[bs]/)
+			)
+		       or $type eq "t" or $type eq "b"
+		       ); #$type b is obsolete, 'tho.
+    return "SERIALS" if (
+			 ($type eq "a") && 
+			 ($bib_lvl =~/[bs]/)
+			 );
+    return "COMPUTER_FILES" if ($type =~/m/);
+    return "MAPS" if ($type =~/[ef]/);
+    return "MUSIC" if ($type =~/[cdij]/);
+    return "VIS" if ($type =~/[gkro]/);
+    return "MIX" if ($type =~/p/);
+    return "UNKNOWN (Type $type Bib_Lvl $bib_lvl) ??"; # Shouldn't happen
+}
+
+####################################################################
+#Takes a record number.                                            #
+#Returns the unpacked 008 as a ref to hash. Installs ref in $self. #
+####################################################################
+sub unpack_008 { # rec
+    my ($marcrec) = @_;
+    my ($ff_string) = $marcrec->getfirstvalue({field=>'008'});
+    my $bib_format = $marcrec->bib_format();
+    my $rh008= $marcrec->_unpack_008($ff_string,$bib_format);
+    $marcrec->{unp_008}=$rh008;
+    return $rh008;
+}
+
+sub _unpack_008 { # rec
+    my ($marcrec,$ff_string,$bib_format) = @_;
+    my %ans=();
+
+    my $ff_templ=$FF_TEMPLATE{$bib_format};
+    my $raff_fields=$FF_FIELDS{$bib_format};
+    if ($bib_format =~/UNKNOWN/) {
+        mycarp "Format is $bib_format";
+	return;
+    }
+    my @fields=unpack($ff_templ,$ff_string);
+    for (@{$raff_fields}) {
+      $ans{$_}=shift @fields;
+    }
+    return \%ans;
+}
+
+####################################################################
+#Takes a record number.                                            #
+#Returns the unpacked 008 as a ref to hash from the ref in $self.  #
+#Does not overwrite hash from 008 field.                           #
+####################################################################
+sub get_hash_008 { # rec
+    my ($marcrec)=@_;
+    return undef unless exists($marcrec->{unp_008});
+    return $marcrec->{unp_008};
+}
+
+####################################################################
+#Takes a record number. Flushes hashes to 008 and ldr.             #
+#Updates the 008 field from an installed fixed field hash.    
+#Returns undef unless there is a hash, else returns the 008 field  #
+####################################################################
+sub pack_008 { # rec
+    my ($marcrec) = @_;
+    $marcrec->pack_ldr();
+    my $ldr = $marcrec->ldr();
+    my $rhff = $marcrec->get_hash_008();
+    return undef unless $rhff;
+    my $ff_string = $marcrec->_pack_008($ldr,$rhff);
+    $marcrec->updatefirst({field=>'008'},$ff_string);
+    return $ff_string;
+}
+
+####################################################################
+#Takes LDR and ref to hash of unpacked 008                         #
+#Returns string version of 008 *without* newlines.                 #
+####################################################################
+sub _pack_008 { # rec
+    my ($marcrec,$ldr,$rhff) = @_;
+    my $bib_format = $marcrec->_bib_format($ldr);
+    my $ans  = "";
+    my @fields = ();
+    for (@{$FF_FIELDS{$bib_format}}) {
+	push @fields, $rhff->{$_};
+    }
+    $ans = pack($FF_TEMPLATE{$bib_format},@fields);
+    return $ans;
+}
+
+####################################################################
+
+# as_string returns a newline-\c^ separated version of the record.
+# Subclasses may need to override this. If so, to make Tie happy,
+# they should override from_string. 000 is ldr.
+
+####################################################################
+
+sub as_string {
+    my $marcrec=shift;
+    my $SEP = "\cJ"; #unix newline
+    my $ans = "";
+    for (@{$marcrec->{'array'}}) {
+	my $tag = $_->[0];
+	if ($tag < 10) {
+	    $ans .= "$tag $_->[1]$SEP";
+	    next;
+	}
+	$ans .= "$tag $_->[1]$_->[2] ";
+	foreach (my $i=3; $i<$#$_; $i+=2) {
+	    $ans .="\c_$_->[$i]$_->[$i+1]";
+	}
+	$ans .=$SEP;
+    }
+    return $ans;
+}
+
+####################################################################
+
+# from_string takes a newline-\c^ separated version of the record
+# and replaces the {array} information from that information.
+# Subclasses may need to override this. If so, to make Tie happy,
+# they should override as_string. 000 is ldr.
+
+####################################################################
+sub from_string {
+    my $marcrec=shift;
+    my $string = shift;
+    my $do_rebuild_map = shift;
+    my $SEP = "\cJ"; #unix newline
+    my @lines = split /$SEP/,$string;
+    @{$marcrec->{'array'}}=();
+    for (@lines) {
+	next if /^\s*$/;
+	my $tag = substr($_,0,3);
+	if ($tag < 10) {
+	    my $contents = substr($_,4);
+	    push @{$marcrec->{'array'}}, [$tag, $contents];
+	    next;
+	}
+	my ($i1,$i2,$sub_string) = (substr($_,4,1),substr($_,5,1),substr($_,7));
+	my @field = ($tag,$i1,$i2);
+	my @subfields = split /\c_(.)/,$sub_string;
+	shift @subfields if $subfields[0] eq ''; # feature of split.
+	push @field,@subfields;
+	push @{$marcrec->{'array'}}, [@field];
+    }
+    $marcrec->rebuild_map_all() if $do_rebuild_map;
 }
 
 1;  # so the require or use succeeds
@@ -2175,7 +2986,7 @@ MARC.pm - Perl extension to manipulate MAchine Readable Cataloging records.
 
 	# header and control field operations
   $rldr = $x->unpack_ldr($record);
-  print "Desc is $rldr{Desc}";
+  print "Desc is $rldr->{Desc}";
   next if ($x->bib_format($record) eq 'SERIALS');
   $rff = $x->unpack_008($record);
   last if ($rff->{'Date1'}=~/00/ or $rff->{'Date2'}=~/00/);
@@ -2197,6 +3008,36 @@ MARC.pm - Perl extension to manipulate MAchine Readable Cataloging records.
   $x->output({file=>">my_marcmaker.mkr",'format'=>"marcmaker",
 	      nolinebreak=>'y',lineterm=>'\n'});
   $x->output({file=>">titles.html",'format'=>"html", 245=>"Title: "});    
+
+        # manipulation of individual marc records.
+  @recs = $x[1..$#$x];
+  grep {$_->unpack_ldr() && 0} @recs;
+  @LCs = grep {$_->unp_ldr{Desc} eq 'a' &&
+	       $_->getvalue({field=>'040'}) =~/DLC\c_.DLC/} @recs;
+  foreach my $rec (@LCs) {
+	  print $rec->output({format=>'usmarc'});
+  }
+  
+        # manipulation as strings.
+  foreach my $rec (@LCs) {
+	  my $stringvar = $rec->as_string();
+	  $stringvar=~s[^(
+			  100\s # main entries of this stripe..
+			  ..\s # (don't care about indicators)
+			  \c_.\s*
+			  )(\S) # take the first letter..
+			] [
+			${1}uc($2) # and upcase it. All authors have 
+				   # upcase first letters in my library.
+			]xm; # x means 'ignore whitespace and allow
+			     # embedded comments'. 
+	 $rec->from_string($stringvar);
+	 my ($i2,$article) = $stringvar =~/245 .(.) \c_.(.{0,9})/;	
+	 $article = substr($article,0,$i2) if $i2=~/\d/;
+	 print "article $article is not common" unless $COMMON_ARTS{$article};
+  }
+	 
+  
 
 =head1 DESCRIPTION
 
@@ -2387,6 +3228,16 @@ You can also use the optional I<file> and I<format> parameters to create and pop
     $x = MARC->new("mymarc.dat","usmarc");
     $x = MARC->new("mymarcmaker.mkr","marcmaker");
 
+Creates a new MARC::Rec object.
+
+    $rec=MARC::Rec->new();
+    $rec=MARC::Rec->new($filehandle,"usmarc");
+
+MARC::Rec objects are typically created by reading from a filehandle using nextrec()
+and a proto MARC::Rec object or by directly stuffing the @{$rec->{'array'}} array.
+    
+
+
 =head2 openmarc()
 
 Opens a specified file for reading data into a MARC object. If no format is specified openmarc() will default to USMARC. The I<increment> parameter defines how many records you would like to read from the file. If no I<increment> is defined then the file will just be opened, and no records will be read in. If I<increment> is set to -1 then the entire file will be read in.
@@ -2429,6 +3280,50 @@ note: Similar to openmarc(), nextmarc() will return the number of records read i
     $y=$x->nextmarc();
     print "$y more records read in!";
 
+=head2 nextrec()
+
+MARC:Rec instances can read from a filehandle and produce a new MARC::Rec instance.
+If nextrec is passed a string, it will read from that instead. The string should be
+formatted according to the {format} field of the instance.
+
+Cases where a new instance cannot be created are classified by a status value:
+
+    my ($newrec,$status) = $rec->nextrec();
+
+$status is undefined if we are at the end of the filehandle. If the
+data read from the filehandle cannot be made into a marc record,
+$status will be negative.  For example, $status is -1 if there is a
+distinction between recsize and leader definition of recsize, and -2
+if the leader is not numeric.
+
+An idiom for reading records incrementally with MARC::Recs is:
+
+    my $proto=MARC::Rec->new($filehandle,$format);
+    while (1) {
+	  my ($rec,$status)=$proto->nextrec();
+	  last unless $status;
+	  die "Bad record, bad, bad record: error $status"
+	      if $status <0;
+	  print $rec->output({$format=>'ascii'});
+	  # or replace print and output with your own functions/methods.
+    }
+    close $filehandle or die "File $filehandle is not happy on close\n";
+
+If you are getting records from an external source as strings, the idiom is:
+
+    my $proto=MARC::Rec->new($filehandle,$format);
+    while (1) {
+          my $string = get_external_marc();
+          last unless $string;
+          my ($rec,$status)=$proto->nextrec($string);
+          last unless $status;
+          die "Bad record, bad, bad record: error $status"
+              if $status <0;
+          print $rec->output({$format=>'ascii'});
+          # or replace print and output with your own functions/methods.
+    }
+
+
 =head2 closemarc()
 
 If you are finished reading in records from a file you should close it immediately.
@@ -2456,7 +3351,7 @@ you change the tag).
    while (<>) {
         chomp;
         my ($author,$title) = split(/\t/);
-        $rnum = $x->createrecord({leader=>
+        my $rnum = $x->createrecord({leader=>
 			    	       "00000nmm  2200000 a 4500"});
 
         my @auth = (100, ' ', ' ', a=>$author);
@@ -2466,6 +3361,9 @@ you change the tag).
         push @{$x->[$rnum]{array}}, \@title;
         $x->add_map($rnum,\@title);
    }
+
+MARC::Rec::add_map($rfield) does not need the record specification and has the same
+effect as add_map.
 
 =head2 rebuild_map
 
@@ -2481,11 +3379,16 @@ the array elements of the marc record at the recnum with that tag.
       $x->rebuild_map($recnum,092);
       #All fixed.
 
+MARC::Rec::rebuild_map($tag) does not need the record number and has the same effect
+as rebuild_map.
+
 =head2 rebuild_map_all
 
 rebuild_map takes a recnum and will synchronise the index with
 the array elements of the marc record at the recnum.
 
+MARC::Rec::rebuild_map_all() does not need the record number and has the same effect
+as rebuild_map_all.
 
 =head2 getfields
 
@@ -2498,6 +3401,9 @@ tags mixed in. Consecutive calls to updatefields with a different
 tag and the same record are probably a bad idea unless you have assurance
 that fields with the same tag are always together.
 
+MARC::Rec::getfields is identical to getfields, but ignores any record
+specification in the template.
+
 =head2 marc_count()
 
 Returns the total number of records in a MARC object. This method was
@@ -2506,6 +3412,15 @@ of the same name. Use the new name, the old one is deprecated and will
 disappear shortly.
 
     $length=$x->marc_count();
+
+=head2 getfirstvalue()
+
+getfirstvalue will return the first value of a field or subfield or
+indicator or i12 in a particular record found in the MARC object. It
+does not depend on the index being up to date.
+
+MARC::Rec::getfirstvalue is identical to getfields, but ignores any record
+specification in the template.
 
 =head2 getvalue()
 
@@ -2519,6 +3434,8 @@ This method will retrieve MARC field data from a specific record in the MARC obj
 
         #get all of the subfield u's from the 856 field
     @results = $x->getvalue({record=>'12',field=>'856',subfield=>'u'});
+
+MARC::Rec::getvalue($template) is identical to getvalue, but ignores any record specification.
 
 =head2 unpack_ldr($record)
 
@@ -2550,6 +3467,7 @@ The hash version contains the following information:
 	len_impl	22	   1	Length "implementation dep" [0]
 	Undef2ldr	23	   1	[0]
 
+MARC::Rec::unpack_ldr() is identical to unpack_ldr, but does not need the record number.
 
 =head2 get_hash_ldr($record)
 
@@ -2562,6 +3480,8 @@ hash versions of the ldr.
      $rhldr->{'Desc'} =~ s/a/b/;
      $ldr = $x->pack_ldr($record);
 
+MARC::Rec::get_hash_ldr() is identical to get_hash_ldr, but does not need the record number.
+
 =head2 pack_ldr($record)
 
 Takes a record number. Updates the appropriate ldr. 
@@ -2570,15 +3490,19 @@ Takes a record number. Updates the appropriate ldr.
      my $ldr = $x->pack_ldr($record);
      return undef unless $ldr;
 
+MARC::Rec::pack_ldr() is identical to pack_ldr, but does not need the record number.
+
 =head2 bib_format($record)
 
-Takes a record number.Returns the "format" used in determining the meanings of the fixed fields in 008. Will force update of the ldr based on any existing hash version.
+Takes a record number. Returns the "format" used in determining the meanings of the fixed fields in 008. Will force update of the ldr based on any existing hash version.
 
       foreach $record (1..$#$x) {
 	    next if $x->bib_format($record) eq 'SERIALS';
 		# serials are hard
 	    do_something($x->[record]);
       }
+
+MARC::Rec::bib_format() is identical to bib_format, but does not need the record number.
 
 =head2 unpack_008($record)
 
@@ -2591,6 +3515,8 @@ Installs the ref as $marc->[$record]{unp_008}
 		if ($rff->{'Date1'}=~/00/ or $rff->{'Date2'}=~/00/);
       }
 
+MARC::Rec::unpack_008() is identical to unpack_008, but does not need the record number.
+
 =head2 get_hash_008($record)
 
 Takes a record number. Returns a ref to the cached version of the hash 008 if it exists.
@@ -2602,6 +3528,8 @@ hash versions of the 008.
      $rh008->{'Date1'} =~ s/00/01/;
      my $m008 = $x->pack_008($record);
      return undef unless $m008;
+
+MARC::Rec::get_hash_008() is identical to get_hash_008, but does not need the record number.
 
 =head2 pack_008($record)
 
@@ -2616,6 +3544,8 @@ ldr based on any existing hash version.
 	    # New value is in the 008 field of $record'th marc
       }
 
+MARC::Rec::pack_008() is identical to pack_008, but does not need the record number.
+
 =head2 deletefirst()
 
 deletefirst() takes a template. It deletes the field data for a first
@@ -2628,7 +3558,11 @@ also rebuilds the map if the template asks for that
 $do_rebuild_map. Deletefirst returns the number of matches deleted
 (that would be 0 or 1), or undef if it feels grumpy (i.e. carps).
 
+MARC::Rec::deletefirst($template) is identical to deletefirst, but ignores any record number
+specified by $template.
+
 Most use of deletefirst is expected to be by MARC::Tie.
+
 
 =head2 deletemarc()
 
@@ -2660,6 +3594,9 @@ based on the subfield information in the array. If the template has no
 subfield information then indicators are left untouched unless a new
 field needs to be created, in which case they are left blank.
 
+MARC::Rec::updatefirst($template) is identical to deletefirst, but ignores any record number
+specified by $template.
+
 Most use of updatefirst() is expected to be from MARC::Tie.
 It does not currently provide a useful return value.
 
@@ -2690,6 +3627,8 @@ Returns 0 or a ref to the value to be updated.
     my $rval = getmatch('i2',$rvictim);
     $$rval = "4" if $rval;
 
+MARC::Rec::getmatch($subf,$rfield) is identical to getmatch;
+
 =head2 insertpos()
 
 insertpos() takes a subfield code (can not be an indicator), a value,
@@ -2709,6 +3648,7 @@ $fieldref.
 	$x->insertpos('a',$value,$rvictim);
     }
 
+MARC::Rec::insertpos($subf,$value,$rfield) is identical to insertpos;
 
 =head2 selectmarc()
 
@@ -2753,13 +3693,15 @@ This method will allow you to search through a MARC object, and retrieve record 
 
 =head2 createrecord()
 
-You can use this method to initialize a new record. It only takes one optional parameter, I<leader> which sets the 24 characters in the record leader: see http://lcweb.loc.gov/marc/bibliographic/ecbdhome.html for more details on the leader. Note: you do not need to pass character positions 00-04 or 12-16 since these are calculated by MARC.pm if outputting to MARC you can assign 0 to each position. If no leader is passed a default USMARC leader will be created of "00000nam  2200000 a 4500". createrecord() will return the record number for the record that was created, which you will need to use later when adding fields with addfield().
+You can use this method to initialize a new record. It only takes one optional parameter, I<leader> which sets the 24 characters in the record leader: see http://lcweb.loc.gov/marc/bibliographic/ecbdhome.html for more details on the leader. Note: you do not need to pass character positions 00-04 or 12-16 since these are calculated by MARC.pm if outputting to MARC you can assign 0 to each position. If no leader is passed a default USMARC leader will be created of "00000nam  2200000 a 4500". createrecord() will return the record number for the record that was created, which you will need to use later when adding fields with addfield(). Createrecord now makes the new record an instance of an appropriate MARC::Rec subclass. 
 
     use MARC;
     my $x = new MARC;
     $record_number = $x->createrecord();
     $record_number = $x->createrecord({leader=>
 			    	       "00000nmm  2200000 a 4500"});
+
+MARC::Rec::createrecord($leader) returns an instance of a suitable subclass of MARC::Rec.
 
 =head2 getupdate()
 
@@ -2841,6 +3783,10 @@ The I<MARCMaker> Specification requires that long lines be split to less
 than 80 columns. While that behavior is the default, the I<nolinebreak>
 parameter can override it and the resulting output will be much like the
 I<ascii> format.
+
+MARC::Rec::output($template) is the same as output except that ignores
+record number(s) and only outputs its caller. (E.g., with $format
+eq 'urls' it does not output html header and footer information.)
 
 =over 4
 
@@ -2926,6 +3872,7 @@ XML
 Roundtrip conversion between MARC and XML is handled by the subclass 
 MARC::XML. MARC::XML is available for download from the CPAN.
 
+
 =back
 
 =head2 usmarc_default()
@@ -2942,6 +3889,8 @@ input.
     $x->openmarc({file=>"makrbrkr.mrc",'format'=>"marcmaker",
 		  charset=>\%inc});
 
+MARC::Rec::usmarc_default is identical to usmarc_default;
+
 =head2 ustext_default()
 
 This method returns a hash reference to a translation table between single-byte
@@ -2954,6 +3903,24 @@ values of the form '{esc}'. It is used during MARCMaker output.
     $outc{'$'} = '{uscash}';
     printf "dollar = %s\n", $outc{'$'};	# prints '{uscash}'
     $y = $x->output({'format'=>"marcmaker", charset=>\%outc});
+
+MARC::Rec::ustext_default is identical to ustext_default;
+
+=head2 as_string()
+
+As_string() takes no paramaters and returns a (Unix) newline separated version of the record.
+
+  Format is: $tag<SPACE>$i1$i2<SPACE>$subfields
+  where $subfields are separated by "\c_" binary subfield indicators.
+  Tag 000 is ldr.
+
+Subclasses may need to override this format. If so, 
+they should override from_string.
+
+=head2 from_string()
+
+From_string() takes a string paramater and updates the calling record's {array} information.
+It assumes the string is formatted like the output of as_string(). 
 
 =head1 EXAMPLES
 
@@ -3020,6 +3987,37 @@ Perhaps you have a tab delimited text file of data for online journals you have 
     close INPUT_FILE;
     $x->output({file=>">dowjones.mrc",'format'=>"usmarc"})
 
+=item * 
+
+Perhaps you have periodicals coming in that you want to order by 
+location and then title. MARC::Rec's get you out of some array indexing.
+
+#!/usr/bin//perl
+use MARC 1.03;
+
+my @newmarcs=@$marc[1..$#$marc]; # array slice.
+my @sortmarcs = sort by_loc_oclc @newmarcs;
+@marc[1..$#$marc] = @sortmarcs;
+
+sub by_loc_title {
+    my ($aloc,$atitle) = loc_title($a);
+    my ($bloc,$btitle) = loc_title($b);
+    return  $aloc cmp $bloc 
+	          ||
+	  $atitle cmp $btitle;
+}
+
+sub loc_title {
+    my ($rec)=@_;
+    my $n049 = $rec->getfirstvalue({field=>040});
+    my ($loc) = $n049=~/(ND\S+)/; # Or the first two letters of your OCLC
+                                  # location.
+
+    my $title = $rec->getfirstvalue({field=>100,delimiter=>" "});
+
+    return ($loc,$title);
+}
+
 =back
 
 =head1 NOTES
@@ -3036,8 +4034,11 @@ http://www.vims.edu/perl4lib
 
 Two global boolean variables are reserved for test and debugging. Both are
 "0" (off) by default. The C<$TEST> variable disables internal error messages
-generated using I<Carp>. It should only be used in the automatic test suite.
-The C<$DEBUG> variable adds verbose diagnostic messages.
+generated using I<Carp>. It also overrides the date_stamp in the "005" field
+with a constant "19960221075055.7". It should only be used in the automatic
+test suite. The C<$DEBUG> variable adds verbose diagnostic messages. Since
+both variables are used only in testing, I<MARC::Rec> uses C<$MARC::TEST>
+and C<$MARC::DEBUG> rather than define a second pair.
 
 =head1 AUTHORS
 
@@ -3049,7 +4050,7 @@ Derek Lane dereklane@pobox.com
 
 Charles McFadden chuck@vims.edu
 
-Ed Summers esummers@odu.edu
+Ed Summers ed@cheetahmail.com
 
 =head1 SEE ALSO
 
@@ -3057,10 +4058,9 @@ perl(1), http://lcweb.loc.gov/marc
 
 =head1 COPYRIGHT
 
-Copyright (C) 2000, Bearden, Birthisel, Lane, McFadden, and Summers.
+Copyright (C) 1999,2000, Bearden, Birthisel, Lane, McFadden, and Summers.
 All rights reserved. This module is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself. 17 January 2000.
-Portions Copyright (C) 1999, Duke University, Lane.
+it and/or modify it under the same terms as Perl itself. 23 April 2000.
+Portions Copyright (C) 1999,2000, Duke University, Lane.
 
 =cut
-

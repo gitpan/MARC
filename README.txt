@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.05, 31 January 2000
+VERSION=1.07, 23 April 2000
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -38,11 +38,13 @@ FILES:
 
     t			- test directory
     t/marc.dat		- two record data file for testing
+    t/marc4.dat		- slightly different version of t/marc.dat
     t/badmarc.dat	- corrupt data file for testing
     t/test1.t		- basic tests, search, update
     t/test2.t		- MARCMaker format tests
     t/test3.t		- Inheritance version of test1.t
     t/test4.t		- tests for the *map* methods
+    t/test5.t		- updatefirst/deletefirst tests
     t/MARCopt.pm	- Inheritance stub module
     t/makrbrkr.mrc	- LoC. MARCMaker reference records
     t/makrtest.src	- MARCMaker source for makrbrkr.mrc
@@ -118,7 +120,7 @@ comments:
 
 COMPATIBILITY:
 
-The length() method has been deprecated because it overrides a Perl builtin.
+The length() method has been removed because it overrides a Perl builtin.
 Use the new marc_count() method instead.
 
 Version 0.93 adds character_set conversions to MarcMaker format reads and
@@ -129,7 +131,8 @@ Starting with version 1.00, the XML conversions are moved to MARC::XML.
 
 Version 1.05 no longer assumes fields with same tag are contiguous. This
 is required for CJK characters and may introduce other changes from earlier
-conversions.
+conversions. The addition of proper date stamp generation in the "005" field
+may now create different output from the same source data.
 
 NOTES:
 
@@ -155,7 +158,7 @@ AUTHORS:
 
 COPYRIGHT
 
-Copyright (C) 2000, Bearden, Birthisel, Lane, McFadden, and Summers.
+Copyright (C) 1999, 2000 Bearden, Birthisel, Lane, McFadden, and Summers.
 All rights reserved. This module is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
-Portions Copyright (C) 1999, Duke University, Lane.
+Portions Copyright (C) 1999, 2000 Duke University, Lane.

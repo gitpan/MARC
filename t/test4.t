@@ -2,9 +2,8 @@
 
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test1.t'
+
 use lib '.','./t';	# for inheritance and Win32 test
-## use lib './blib/lib','../blib/lib','./lib','../lib','..';
-# can run from here or distribution base
 
 ######################### We start with some black magic to print on failure.
 

@@ -235,6 +235,42 @@ Revision history for Perl extension MARC.
 	Mon Jan 31 12:55:52 EST 2000 <Lane>
 	- Fixed $args->{'record'} complaint if $args does not exist.
 	- Now we return "19960221075055.7" when in $TEST mode for 005.
-	- Fixed and updated test2.t and test files makrbrkr.mrc and makrtest.src.
-	  (now have all canonical 005's; makrtest had a 17 digit time, not 16 in the
-	  first record).
+	- Fixed and updated test2.t and test files makrbrkr.mrc and
+	  makrtest.src. (now have all canonical 005's; makrtest had a
+	  17 digit time, not 16 in the first record).
+
+1.06   Sun Feb 27 22:00:00 EST 2000 <Lane>
+	- Added getfirstvalue to avoid dependency on index for Ties.
+	- Added from_string and as_string; mainly for Tie
+	  but also has promise for searchmarc. Added option to rebuild map. 
+	- Created MARC::Rec and started moving functions to it.
+
+	Thu Mar  9 22:00:00 EST 2000 <Lane>
+	- Finished the bulk of ::Rec-ising.
+	- Normalised {records}-{record} handling and %params creation 
+	  (_records and _params).
+	- Updated searchmarc and deletemarc to more idiomatic Perl; fixed bugs.
+	  (Deletemarc was not updating {$tag}{$field}{subfield} information
+	  correctly; it does now since it uses rebuild_map).
+	- Fixed one potential problem in _urls (looked at indicators when it
+	  should have only been looking at subfields).
+
+	Sat Mar 11 22:00:00 EST 2000 <Lane>
+	- Checked that a subclass of MARC(:Btrieve) works even in the presence
+	  of MARC::Rec dependencies.
+	- Tested Tie::MARC and Tie::MARC::Btrieve against 1.06
+	- Fixed bugs. All tests pass.
+	- Updated Docs to reflect pervasive MARC::Rec presence and (few)
+	  additional functions.
+
+	Sun Mar 12 14:39:27 EST 2000 <Lane>
+	- Configured shipping script for MARC.
+	- Fixed numbering in test5.t. All tests pass.
+	- Added option to read from a string for MARC::Rec. (nextmarc())
+
+1.07   Sun Apr 23 16:41:46 CDT 2000A <Birthisel>
+	- convert all usage to $MARC::TEST, $MARC::DEBUG. Clean up other
+	  "use vars" variables only needed in one package. Sync $VERSION.
+	- Perl 5.6.0 warns on "join (//,", use "join (''," instead.
+	- fixes to $naptime and $testfile in t/test5.t
+	- openmarc did not set 'handle' and 'format' for MARC::Rec

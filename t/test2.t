@@ -4,8 +4,6 @@
 # `make test'. After `make install' it should work as `perl test1.t'
 
 use lib '.','./t';	# for inheritance and Win32 test
-## use lib './blib/lib','../blib/lib','./lib','../lib','..';
-# can run from here or distribution base
 
 ######################### We start with some black magic to print on failure.
 
@@ -23,7 +21,6 @@ my $tc = 2;		# next test number
 
 use strict;
 use File::Compare;
-## use Data::Dumper;
 
 sub out_cmp {
     my $outfile = shift;
@@ -107,7 +104,6 @@ is_ok ($x->output({file=>">output.bkr",'format'=>"marcmaker",
 	nolinebreak=>'y'}));					# 4
 out_cmp ("output.bkr", $file2);					# 5
 
-##  print Dumper ($x);
 my $y;
 is_ok ($y = $x->output());					# 6
 

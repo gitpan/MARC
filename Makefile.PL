@@ -4,7 +4,7 @@ use ExtUtils::MakeMaker;
 
 require 5.004;
 
-unless ($^O eq "MSWin32") {
+unless ($^O =~ /Win/i) {
     WriteMakefile(
         'NAME'	=> 'MARC',
         'VERSION_FROM' => 'MARC.pm', # finds $VERSION
@@ -57,7 +57,7 @@ TEST4
 
 print DEFAULT <<'TEST4';	# single quotes - minimize chaacter quoting
 use Test::Harness;
-runtests ("t/test1.t","t/test2.t","t/test3.t","t/test4.t");
+runtests ("t/test1.t","t/test2.t","t/test3.t","t/test4.t","t/test5.t");
 
 print "\nTo run individual tests, type:\n";
 print "    C:\\> perl t/test?.t Page_Pause_Time (0..5)\n";
