@@ -14,5 +14,6 @@ t/makrtest.src
 t/brkrtest.ref
 eg/addlocal.pl
 eg/fixlocal.pl
+eg/uclocal.pl
 eg/microlif.001
 eg/specials.001

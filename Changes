@@ -168,3 +168,9 @@ Revision history for Perl extension MARC.
 	  in 5.005 and fails in 5.004. Detected by CPAN-Testers
 	- Add tests for deletemarc() subfield to t/test2.t
 
+0.98   Fri Nov 12 21:13:39 CST 1999
+	- fix addfield reorder bug (new tag > existing)
+	- improved eg/addlocal.pl and added eg/uclocal.pl
+	- moved binmode from _readmarc* to openmarc() and new() to get around
+	  unwanted seek on binmode in Win32 5.00402.
+

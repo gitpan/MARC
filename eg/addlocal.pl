@@ -21,15 +21,23 @@
 # librarian can update those manually. Finally, we will insert the call
 # number as a 900 tag.
 
-    # use lib '..';
-    use MARC 0.92;
+    use MARC 0.93;
     my $infile = "microlif.001";
     my $outfile = "output.002";
     my $outfile2 = "output2.txt";
-    my $outfile3 = "output.mkr";
     my $outtext = "output.txt";
-    unlink $outfile, $outtext, $outfile2, $outfile3;
-    
+    unlink $outfile, $outtext, $outfile2;
+
+# Your filenames will vary. You probably want absolute pathnames.
+# In Clinton, WI, we have a shortcut to the newbooks.d directory and
+# use these:
+#   my $infile = "a:\\microlif.001";			# floppy from vendor
+#   my $outfile = "d:\\microlif.002";			# file to import 
+#   my $outfile2 = "d:\\newbooks.d\\updated.txt";	# ascii to check
+#   my $outtext = "d:\\newbooks.d\\missing.txt";	# needs attention
+
+    my $count = 0;
+    my $missing = 0;    
     $x = MARC->new;
     $x->openmarc({file=>$infile,'format'=>"usmarc"}) || die;
 
@@ -59,10 +67,15 @@
 # have 9xx tags (e.g. 935), we want 'ordered' (which is also the default).
 
         $x->output({file=>">>$outfile",'format'=>"usmarc"});
-        $x->output({file=>">>$outtext",'format'=>"ascii"}) unless $callno;
-        $x->output({file=>">>$outfile2",'format'=>"ascii"});
-        $x->output({file=>">>$outfile3",'format'=>"marcmaker"});
+	unless ($callno) {
+            $x->output({file=>">>$outtext",'format'=>"ascii",
+		lineterm=>"\r\n"});
+	    $missing++;
+	}
+        $x->output({file=>">>$outfile2",'format'=>"ascii",
+		lineterm=>"\r\n"});
         $x->deletemarc(); #empty the object for reading in another
+	$count++;
     }
 
 # We write all the records to the output file in MARC format. Even the
@@ -71,5 +84,13 @@
 # attention and all the Title, Author, Publication and related data needed
 # to assign location based on standard references. This demo also writes
 # an ascii version of its output as $outfile2 so the final MARC records
-# can be viewed with the changes.
+# can be viewed with the changes. Since Clinton runs on NT, we specify
+# a Notepad-compatible line termination.
+
+    print "\nprocessed $count records\n";
+    print "$missing had missing call numbers\n\n";
+    print "press <Enter> to continue\n";
+    my $junk = <>;
+
+# Allow results to be seen even when run from a GUI.
 

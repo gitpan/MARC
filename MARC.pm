@@ -5,7 +5,7 @@ use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG 
 	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
 	    );
-$VERSION = '0.97';
+$VERSION = '0.98';
 $DEBUG = 0;
 
 require Exporter;
@@ -86,6 +86,7 @@ sub new {
 	    # $format defaults to USMARC if undefined
         if ($format =~ /usmarc$/io) {
 	    open(*file, $file) or carp "Open Error: $file, $!";
+	    binmode *file;
 	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'format'}='usmarc';
 	    $totalrecord = _readmarc($marc);
@@ -93,6 +94,7 @@ sub new {
         }
         elsif ($format =~ /unimarc$/io) {
 	    open(*file, $file) or carp "Open Error: $file, $!";
+	    binmode *file;
 	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'format'}='unimarc';
 	    $totalrecord = _readmarc($marc);
@@ -100,6 +102,7 @@ sub new {
         }
         elsif ($format =~ /marcmaker$/io) {
 	    open (*file, $file) or carp "Open Error: $file, $!";
+	    binmode *file;
 	    $marc->[0]{'handle'}=\*file;
 	    $marc->[0]{'lineterm'}="\015\012";	# MS-DOS default for MARCMaker
 	    $totalrecord = _readmarcmaker($marc);
@@ -122,7 +125,6 @@ sub _readmarc {
     my $handle = $marc->[0]{'handle'};
     my $increment = $marc->[0]{'increment'}; #pick out increment from the object
     my $recordcount = 0;
-    binmode $handle;
     local $/ = "\035";	# cf. TPJ #14
     local $^W = 0;	# no warnings
     while (($increment==-1 || $recordcount<$increment) and my $line=<$handle>) {
@@ -135,8 +137,6 @@ sub _readmarc {
 	my $leader=$1; my $dir=$2; my $data=$3;
 	push(@{$record->{'000'}},('000',$leader));
 	push(@{$record->{array}},$record->{'000'});
-##93	push(@{$record->{array}[0]},('000',$leader));
-##93	$record->{'000'}=\$leader;
 	@d=$dir=~/(.{12})/go;
 	for my $d(@d) {
 	    my @field=();
@@ -147,10 +147,7 @@ sub _readmarc {
 	    }
 	    else {
 		my ($indi1, $indi2, $field_data) = unpack ("a1a1a*", $field);
-##93		my $indi1=substr($field,0,1);
-##93		my $indi2=substr($field,1,1);
 		push (@field, "$tag", "$indi1", "$indi2");
-##93		my $field_data = substr($field,2);
 		my @subfields = split(/\037/,$field_data);
 		foreach (@subfields) {
 		    my $delim = substr($_,0,1);
@@ -186,7 +183,6 @@ sub _readmarcmaker {
     my $lineterm = $marc->[0]{'lineterm'} || "\015\012";
 	# MS-DOS file default for MARCMaker
     my $recordcount = 0;
-    binmode $handle;
       #Set the file input separator to "\r\n\r\n", which is the same as 
       #a blank line. A single blank line separates individual MARC records
       #in the MARCMakr format.
@@ -372,6 +368,7 @@ sub openmarc {
         #store increment in the object, default is 0
     unless ($marc->[0]{'format'}) {$marc->[0]{'format'}="usmarc"}; #default to usmarc
     open (*file, $file);
+    binmode *file;
     $marc->[0]{'handle'}=\*file; #store filehandle in object
     if ($marc->[0]{'format'} =~ /usmarc/oi) {
 	$totalrecord = _readmarc($marc);
@@ -1506,7 +1503,7 @@ sub addfield {
     }
 
     my $ordered=$params->{ordered} || "y";
-    my $insertorder;
+    my $insertorder = $#{$marc->[$record]{array}} + 1;
        #if necessary figure out the insert order to preserve tag order
     if ($ordered=~/y/i) {
 	for (my $i=0; $i<=$#{$marc->[$record]{array}}; $i++) {
@@ -1652,7 +1649,7 @@ MARC.pm - Perl extension to manipulate MAchine Readable Cataloging records.
 
 =head1 SYNOPSIS
 
-  use MARC 0.96;
+  use MARC 0.98;
 
 	# constructors
   $x=MARC->new();
@@ -2401,7 +2398,7 @@ perl(1), MARC http://lcweb.loc.gov/marc , XML http://www.w3.org/xml .
 
 Copyright (C) 1999, Bearden, Birthisel, Lane, McFadden, and Summers.
 All rights reserved. This module is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself. 5 November 1999.
+it and/or modify it under the same terms as Perl itself. 12 November 1999.
 Portions Copyright (C) 1999, Duke University, Lane.
 
 =cut

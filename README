@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=0.97, 05 November 1999
+VERSION=0.98, 12 November 1999
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -48,6 +48,8 @@ FILES:
     eg/specials.001	- complex data file for fixlocal demo
     eg/fixlocal.pl	- multi-field search and replace demo with comments
 			  and option templates
+    eg/uclocal.pl	- complex modify/write demo with extensive use of
+			  templates and tutorial comments
 
 INSTALL and TEST:
 
