@@ -57,9 +57,24 @@ Revision history for Perl extension MARC.
 	  eliminate nuisance warnings from Perl 5.004.
 
 0.83  Mon Oct 11 22:22:00 EST 1999
-	- Updated MARC.pm line 108 to store scalar references instead of scalars. 
- 	  This will hopefully cut down on duplication of data in the MARC object.
+	- Updated MARC.pm line 108 to store scalar references instead of
+	  scalars. This will hopefully cut down on duplication of data in
+	  the MARC object.
 	- Also, updated the getvalue(), searchmarc() and addfield() methods to 
 	  reflect the change in the way subfield data is stored.
-	- Added line 220 to return '0 but true' instead of 0 when no records were
-	  read in. This will allow for statemenets like $x->openmarc("test.mrc") || die;
+	- Added line 220 to return '0 but true' instead of 0 when no records
+	  were read in. This will allow for statements like
+	  $x->openmarc("test.mrc") || die;
+
+0.84  Tue Oct 12 22:07:18 CDT 1999
+	- more Win32 Makefile.PL tweaks after TPJ technical review
+	- add binmode for marc file read/write
+	- unspecified 'increment' defaults to 0
+	- fix repeated subfield in field bug in addfield
+
+0.85  Wed Oct 13 21:19:00 EST 1999
+	- modified addfield to push scalar references instead of scalars when 
+	  adding subfield data to the $x->[record]{field}{subfield} data member
+	  on line 859.
+	- updated closemarc to return 1, to allow constructs like
+	  $x->closemarc() || die;

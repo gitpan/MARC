@@ -30,7 +30,8 @@ my @HTML_FILES = "MARC";
     # probably should auto-generate @cleanfiles
 my @cleanfiles = qw( output.txt output.html output.xml output.urls output2.html
 		    t/output.txt t/output.html t/output.xml t/output.urls
-		    t/output2.html output.isbd t/output.isbd
+		    t/output2.html output.isbd t/output.isbd output.mkr
+		    t/output.mkr
 		  );
 
 print <<INTRO3;
@@ -47,16 +48,18 @@ unlink $dfile, @cleanfiles;
 print "Creating new $dfile\n";
 open (DEFAULT, "> $dfile") or die "Can't create $dfile: $!\n";
 
-print DEFAULT <<TEST4;
+print DEFAULT <<"TEST4";	# double quotes - need interpolation
 # Created by Makefile.PL
 # $INST_NAME Version $version
+TEST4
 
+print DEFAULT <<'TEST4';	# single quotes - minimize chaacter quoting
 use Test::Harness;
 runtests ("t/test1.t");
 
-print "\\nTo run individual tests, type:\\n";
-print "    C:\\> perl t/test1.t Page_Pause_Time (0..5)\\n";
-print "See README and other documentation for additional information.\\n\\n";
+print "\nTo run individual tests, type:\n";
+print "    C:\\> perl t/test1.t Page_Pause_Time (0..5)\n";
+print "See README and other documentation for additional information.\n\n";
 TEST4
 
 close DEFAULT;
@@ -85,45 +88,49 @@ unlink $dfile, "pod2html-itemcache","pod2html-dircache";
 print "Creating new $dfile\n";
 open (DEFAULT, "> $dfile") or die "Can't create $dfile: $!\n";
 
-print DEFAULT <<INST5;
+print DEFAULT <<"INST5";
 # Created by Makefile.PL
 # $INST_NAME Version $version
+INST5
 
-use Config qw(\%Config);
+my $template = <<'INST5';
+
+use Config qw(%Config);
 use strict;
 use ExtUtils::Install qw( install );
 
-my \$FULLEXT = "$INST_NAME";
-my \$INST_LIB = "$INST_LIBDIR";
-my \$HTML_LIB = "$INST_HTMLDIR";
+my $FULLEXT = "%s";	# $INST_NAME
+my $INST_LIB = "./lib";
+my $HTML_LIB = "./html";
 
-my \$html_dest = "";	# edit real html base here if autodetect fails
+my $html_dest = "";	# edit real html base here if autodetect fails
 
-if (exists \$Config{installhtmldir} ) {
-    \$html_dest = "\$Config{installhtmldir}";
+if (exists $Config{installhtmldir} ) {
+    $html_dest = "$Config{installhtmldir}";
 }
-elsif (exists \$Config{installprivlib} ) {
-    \$html_dest = "\$Config{installprivlib}";
-    \$html_dest =~ s%\\\\lib%\\\\html%;
+elsif (exists $Config{installprivlib} ) {
+    $html_dest = "$Config{installprivlib}";
+    $html_dest =~ s%\\lib%\\html%;
 }
 
-if ( length (\$html_dest) ) {
-    \$html_dest .= '\\lib\\site';
+if ( length ($html_dest) ) {
+    $html_dest .= '\lib\site';
 }
 else {
-    die "Can't find html base directory. Edit install.pl manually.\\n";
+    die "Can't find html base directory. Edit install.pl manually.\n";
 }
 
 install({
-	   read => "\$Config{sitearchexp}/auto/\$FULLEXT/.packlist",
-	   write => "\$Config{installsitearch}/auto/\$FULLEXT/.packlist",
-	   \$INST_LIB => "\$Config{installsitelib}",
-	   \$HTML_LIB => "\$html_dest"
+	   read => "$Config{sitearchexp}/auto/$FULLEXT/.packlist",
+	   write => "$Config{installsitearch}/auto/$FULLEXT/.packlist",
+	   $INST_LIB => "$Config{installsitelib}",
+	   $HTML_LIB => "$html_dest"
 	  },1,0);
 
 __END__
 INST5
 
+printf DEFAULT $template, $INST_NAME;
 close DEFAULT;
 
     # a low-fat version of parse_version from ExtUtils::MM_Unix.

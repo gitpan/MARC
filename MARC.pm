@@ -3,7 +3,7 @@ package MARC;
 use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG);
-$VERSION = '0.83';
+$VERSION = '0.85';
 $DEBUG = 0;
 
 require Exporter;
@@ -75,6 +75,7 @@ sub _readmarc {
     my $handle = $marc->[0]{'handle'};
     my $increment = $marc->[0]{'increment'}; #pick out increment from the object
     my $recordcount = 0;
+    binmode $handle;
     local $/ = "\035";	# cf. TPJ #14
     local $^W = 0;	# no warnings
     while (($increment==-1 || $recordcount<$increment) and my $line=<$handle>) {
@@ -201,7 +202,8 @@ sub openmarc {
     if (not(-e $file)) {carp "File \"$file\" doesn't exist"; return} 
     $marc->[0]{'format'}=$params->{'format'}; #store format in object
     my $totalrecord;
-    $marc->[0]{'increment'}=$params->{'increment'}; #store increment in the object
+    $marc->[0]{'increment'}=$params->{'increment'} || 0;
+        #store increment in the object, default is 0
     unless ($marc->[0]{'format'}) {$marc->[0]{'format'}="usmarc"}; #default to usmarc
     open (*file, $file);
     $marc->[0]{'handle'}=\*file; #store filehandle in object
@@ -231,6 +233,7 @@ sub closemarc {
     if (not($marc->[0]{'handle'})) {carp "There isn't a MARC file to close"; return}
     close $marc->[0]{'handle'};
     $marc->[0]{'handle'}=undef;
+    return 1;
 }
 
 ####################################################################
@@ -500,6 +503,7 @@ sub output {
     if ($args->{file}) {
 	if ($args->{file} !~ /^>/) {carp "Don't forget to use > or >>: $!"}
 	open (OUT, "$args->{file}") || carp "Couldn't open file: $!";
+        binmode OUT if ($args->{'format'} =~ /marc$/oi);
 	print OUT $output;
 	close OUT || carp "Couldn't close file: $!";
 	return 1;
@@ -609,6 +613,7 @@ sub _marcmaker {
     my @records;
     if ($args->{records}) {@records=@{$args->{records}}}
     else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
+    local $^W = 0;	# no warnings
     for my $i (@records) { #cycle through each record
 	my $record=$marc->[$i];
 	foreach my $fields (@{$record->{array}}) { #cycle each field 
@@ -836,8 +841,8 @@ sub addfield {
     my $params=shift;
     my $record=$params->{record};
     my $field=$params->{field};
-    my $i1=$params->{i1};
-    my $i2=$params->{i2};
+    my $i1=$params->{i1} || " ";
+    my $i2=$params->{i2} || " ";
     my $value=$params->{value};
     my @field;
     if ($field<10) {
@@ -846,16 +851,18 @@ sub addfield {
 	push (@{$marc->[$record]{$field}{field}},\@field); 
     }
     else {
-	push (@field, $field, $i1, $i2, @$value);
+	push (@field, $field, $i1, $i2);
+	my ($sub_id, $subfield);
+	while ($sub_id = shift @$value) {
+	    $subfield = shift @$value;
+	    push (@field, $sub_id, $subfield);
+	    push (@{$marc->[$record]{$field}{$sub_id}}, \$subfield);
+	}
 	push (@{$marc->[$record]{array}},\@field);
 	push (@{$marc->[$record]{$field}{field}},\@field);
 	push (@{$marc->[$record]{$field}{i1}{$i1}},\@field);
 	push (@{$marc->[$record]{$field}{i2}{$i2}},\@field);
 	push (@{$marc->[$record]{$field}{i12}{$i1.$i2}},\@field);
-	my %hash=@$value;
-	foreach my $subfield (keys(%hash)) {
-	    push (@{$marc->[$record]{$field}{$subfield}},\$hash{$subfield});
-	}
     }
 }
 
@@ -888,7 +895,7 @@ MARC.pm - Perl extension to manipulate B<MA>chine B<R>eadable B<C>ataloging reco
 
 =head1 SYNOPSIS
 
- use MARC 0.82;
+ use MARC 0.84;
 
  $x=MARC->new("mymarcfile.mrc");
  $x->output({file=>">my_text.txt",'format'=>"ascii"});
@@ -1037,13 +1044,14 @@ You can also use the optional I<file> and I<format> parameters to create and pop
 
 =head2 openmarc()
 
-Opens a specified file for reading data into a MARC object. If no format is specified openmarc() will default to USMARC. The I<increment> parameter defines how many records you would like to read from the file. If no I<increment> is defined then the file will just be opened, and no records will be read in. I I<increment> is set to -1 then the entire file will be read in.
+Opens a specified file for reading data into a MARC object. If no format is specified openmarc() will default to USMARC. The I<increment> parameter defines how many records you would like to read from the file. If no I<increment> is defined then the file will just be opened, and no records will be read in. If I<increment> is set to -1 then the entire file will be read in.
 
     $x = new MARC;
     $x->openmarc({file=>"mymarc.dat",'format'=>"usmarc",increment=>"1"});
     $x->openmarc({file=>"mymarcmaker.mkr",'format'=>"marcmaker",increment=>"5"});
 
-note: openmarc() will return the amount of records read in. For example:
+note: openmarc() will return the number of records read in. If the file opens
+successfully, but no records are read, it returns C<"0 but true">. For example:
 
     $y=$x->openmarc({file=>"mymarc.dat",'format'=>"usmarc",increment=>"5"});
     print "Read in $y records!";
@@ -1323,10 +1331,7 @@ perl(1), MARC http://lcweb.loc.gov/marc , XML http://www.w3.org/xml .
 Copyright (C) 1999, Bearden, Birthisel, McFadden, Summers. All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself. 6 October 1999.
+under the same terms as Perl itself. 12 October 1999.
 
 =cut
-
-
-
 

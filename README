@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=0.82, 6 October 1999
+VERSION=0.84, 12 October 1999
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -40,7 +40,7 @@ specify an optional PAUSE (0..5 seconds) between pages of output. The
 if any unexpected errors occur (not ok).
 
 SYNOPSIS:
-     use MARC 0.82;
+     use MARC 0.84;
 
      $x=MARC->new("mymarcfile.mrc");
      $x->output({file=>">my_text.txt",format=>"ascii"});
@@ -188,5 +188,5 @@ COPYRIGHT
     rights reserved.
 
     This module is free software; you can redistribute it and/or
-    modify it under the same terms as Perl itself. 6 October 1999.
+    modify it under the same terms as Perl itself. 12 October 1999.
 

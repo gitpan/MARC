@@ -10,9 +10,9 @@ use lib '.','./t','./blib/lib','../blib/lib','./lib','../lib';
 
 ######################### We start with some black magic to print on failure.
 
-BEGIN { $| = 1; print "1..21\n"; }
+BEGIN { $| = 1; print "1..23\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use MARC 0.71;
+use MARC 0.84;
 $loaded = 1;
 print "ok 1\n";
 
@@ -62,8 +62,8 @@ if (@ARGV) {
 }
 
 my $x;
-unlink 'output.txt', 'output.html', 'output.xml',
-       'output.urls', 'output2.html';
+unlink 'output.txt', 'output.html', 'output.xml', 'output.isbd',
+       'output.urls', 'output2.html', 'output.mkr';
 
    # Create the new MARC object. You can use any variable name you like...
    # Read the MARC file into the MARC object.
@@ -91,34 +91,39 @@ is_ok ($x->output({file=>">output.urls",'format'=>"URLS"}));	# 7
    #Output the MARC object to an isbd file
 is_ok ($x->output({file=>">output.isbd",'format'=>"ISBD"}));	# 8
 
+   #Output the MARC object to a marcmaker file
+is_ok ($x->output({file=>">output.mkr",'format'=>"marcmaker"}));	# 9
+
    #Output the MARC object to an html file with titles
 is_ok ($x->output({file=>">output2.html",
-                   'format'=>"HTML","245"=>"TITLE:"}));		# 9
+                   'format'=>"HTML","245"=>"TITLE:"}));		# 10
 
-is_ok (-s 'output.txt');					# 10
-is_ok (-s 'output.html');					# 11
-is_ok (-s 'output.xml');					# 12
-is_ok (-s 'output.urls');					# 13
-is_ok (-s 'output.isbd');					# 14
-my ($size1, $size2, $y);
-is_ok ($size1 = -s 'output2.html');				# 15
-
-   #Append the MARC object to an html file with titles
-is_ok ($x->output({file=>">>output2.html",
-                   'format'=>"HTML","245"=>"TITLE:"}));		# 16
+is_ok (-s 'output.txt');					# 11
+is_ok (-s 'output.html');					# 12
+is_ok (-s 'output.xml');					# 13
+is_ok (-s 'output.urls');					# 14
+is_ok (-s 'output.isbd');					# 15
+is_ok (-s 'output.mkr');					# 16
 
 if ($naptime) {
     print "++++ page break\n";
     sleep $naptime;
 }
 
-is_ok ($size2 = -s 'output2.html');				# 17
+my ($size1, $size2, $y);
+is_ok ($size1 = -s 'output2.html');				# 17
+
+   #Append the MARC object to an html file with titles
+is_ok ($x->output({file=>">>output2.html",
+                   'format'=>"HTML","245"=>"TITLE:"}));		# 18
+
+is_ok ($size2 = -s 'output2.html');				# 19
 $size2 -= ($size1 + $size1);
-is_bad (($size2 > 5) || ($size2 < -5));				# 18
+is_bad (($size2 > 5) || ($size2 < -5));				# 20
 print "size1=$size1, size2=$size2\n";
 
-is_ok ($y = $x->output({'format'=>"HTML","245"=>"TITLE:"}));	# 19
-is_ok ($size2 = length ($y));					# 20
+is_ok ($y = $x->output({'format'=>"HTML","245"=>"TITLE:"}));	# 21
+is_ok ($size2 = length ($y));					# 22
 $size2 -= $size1;
-is_bad (($size2 > 8) || ($size2 < -8));				# 21
+is_bad (($size2 > 8) || ($size2 < -8));				# 23
 print "size1=$size1, size2=$size2\n";
