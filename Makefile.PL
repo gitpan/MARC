@@ -4,7 +4,7 @@ use ExtUtils::MakeMaker;
 
 require 5.004;
 
-unless ($^O =~ /Win/i) {
+unless ($^O!~/cygwin/i && $^O =~ /Win/i) {
     WriteMakefile(
         'NAME'	=> 'MARC',
         'VERSION_FROM' => 'MARC.pm', # finds $VERSION

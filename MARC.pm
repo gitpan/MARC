@@ -4,7 +4,7 @@ use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST);
 
-$VERSION = '1.14';
+$VERSION = '1.15';
 $MARC::DEBUG = 0;
 $MARC::TEST = 0;
 

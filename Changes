@@ -327,3 +327,9 @@ Revision history for Perl extension MARC.
 1.14   Sat Dec 29 17:07:44 2001 <Summers>
 	- fixed boundary condition bug in add_map (line 1995)
 	- added info about MARC::Record to documentation 
+
+1.15   Sat Mar 30 06:44:06 2002 <Summers>
+        - minor change to Makefile.PL to support building in cygwin
+	  environment
+
+
