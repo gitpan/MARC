@@ -56,3 +56,10 @@ Revision history for Perl extension MARC.
 	- Added single quotes to hash keys in MARC.pm and t/test1.t to
 	  eliminate nuisance warnings from Perl 5.004.
 
+0.83  Mon Oct 11 22:22:00 EST 1999
+	- Updated MARC.pm line 108 to store scalar references instead of scalars. 
+ 	  This will hopefully cut down on duplication of data in the MARC object.
+	- Also, updated the getvalue(), searchmarc() and addfield() methods to 
+	  reflect the change in the way subfield data is stored.
+	- Added line 220 to return '0 but true' instead of 0 when no records were
+	  read in. This will allow for statemenets like $x->openmarc("test.mrc") || die;

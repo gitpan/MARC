@@ -3,7 +3,7 @@ package MARC;
 use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG);
-$VERSION = '0.82';
+$VERSION = '0.83';
 $DEBUG = 0;
 
 require Exporter;
@@ -105,7 +105,7 @@ sub _readmarc {
 		    next unless $delim;
 		    my $subfield_data = substr($_,1);
 		    push(@field, "$delim", "$subfield_data");
-		    push(@{$record->{$tag}{$delim}}, $subfield_data);
+		    push(@{$record->{$tag}{$delim}}, \$subfield_data);
 		} #end parsing subfields
 		push(@{$record->{$tag}{i1}{$indi1}},\@field);
 		push(@{$record->{$tag}{i2}{$indi2}},\@field);
@@ -217,6 +217,7 @@ sub openmarc {
 	return;
     }
     print "read in $totalrecord records\n" if $DEBUG;
+    if ($totalrecord==0) {$totalrecord="0 but true"}
     return $totalrecord;    
 }
 
@@ -361,7 +362,7 @@ sub searchmarc {
 	elsif ($searchtype eq "subfieldvalue") {
 	    my $x=$marc->[$i]{$field}{$subfield};
 	    foreach my $y (@$x) {
-		if (eval qq("$y" =~ $regex)) {$flag=1}
+		if (eval qq("$$y" =~ $regex)) {$flag=1}
 	    }
 	    if ($flag) {push (@results,$i)}
 	}
@@ -378,7 +379,7 @@ sub searchmarc {
 	    my $x=$marc->[$i]{$field}{$subfield};
 	    if (not($x)) {push (@results,$i); next}
 	    foreach my $y (@$x) {
-		if (eval qq("$y" =~ $notregex)) {$flag=1}
+		if (eval qq("$$y" =~ $notregex)) {$flag=1}
 	    }
 	    if (not($flag)) {push (@results,$i)}
 	}
@@ -408,7 +409,7 @@ sub getvalue {
     }
     elsif ($field and $subfield) {
 	foreach (my $i; $i<=$#{$marc->[$record]{$field}{$subfield}}; $i++) {
-	    push @values, $marc->[$record]{$field}{$subfield}[$i];
+	    push @values, ${$marc->[$record]{$field}{$subfield}[$i]};
 	}
 	return @values;
     }
@@ -853,7 +854,7 @@ sub addfield {
 	push (@{$marc->[$record]{$field}{i12}{$i1.$i2}},\@field);
 	my %hash=@$value;
 	foreach my $subfield (keys(%hash)) {
-	    push (@{$marc->[$record]{$field}{$subfield}},$hash{$subfield});
+	    push (@{$marc->[$record]{$field}{$subfield}},\$hash{$subfield});
 	}
     }
 }
@@ -944,7 +945,7 @@ MARC -> URLS : This conversion will extract URLs from a batch of MARC records. T
 The module is provided in standard CPAN distribution format. It will
 extract into a directory MARC-version with any necessary subdirectories.
 Change into the MARC top directory. Download the latest version from 
-ftp://libstaff.lib.odu.edu/pub/MARCpm 
+http://www.cpan.org/modules/by-module/MARC/
 
 =item Unix
 
