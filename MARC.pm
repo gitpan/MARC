@@ -3,7 +3,7 @@ package MARC;
 use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG);
-$VERSION = '0.81';
+$VERSION = '0.82';
 $DEBUG = 0;
 
 require Exporter;
@@ -33,7 +33,7 @@ sub new {
     my $marc = []; 
     my $totalrecord;
     #store the default increment 
-    $marc->[0]{increment}=-1; #store the default increment variable in the object
+    $marc->[0]{'increment'}=-1; #store the default increment variable in the object
     #if file isn't defined then just return the empty MARC object
     if (not($file)) {return bless $marc, $class;}
     #if the file doesn't exist return an error
@@ -41,21 +41,21 @@ sub new {
     my $format = shift || "usmarc"; # $format defaults to USMARC if undefined
     if ($format =~ /usmarc$/io) {
 	open(*file, $file);
-	$marc->[0]{handle}=\*file;
-	$marc->[0]{format}='usmarc';
+	$marc->[0]{'handle'}=\*file;
+	$marc->[0]{'format'}='usmarc';
 	$totalrecord = _readmarc($marc);
 	close *file;
     }
     elsif ($format =~ /unimarc$/io) {
 	open(*file, $file);
-	$marc->[0]{handle}=\*file;
-	$marc->[0]{format}='unimarc';
+	$marc->[0]{'handle'}=\*file;
+	$marc->[0]{'format'}='unimarc';
 	$totalrecord = _readmarc($marc);
 	close *file;
     }
     elsif ($format =~ /marcmaker$/io) {
 	open (*file, $file);
-	$marc->[0]{handle}=\*file;
+	$marc->[0]{'handle'}=\*file;
 	$totalrecord = _readmarcmaker($marc);
 	close *file;				  
     }
@@ -72,8 +72,8 @@ sub new {
 ###################################################################
 sub _readmarc {
     my $marc = shift;
-    my $handle = $marc->[0]{handle};
-    my $increment = $marc->[0]{increment}; #pick out increment from the object
+    my $handle = $marc->[0]{'handle'};
+    my $increment = $marc->[0]{'increment'}; #pick out increment from the object
     my $recordcount = 0;
     local $/ = "\035";	# cf. TPJ #14
     local $^W = 0;	# no warnings
@@ -125,8 +125,8 @@ sub _readmarc {
 ###################################################################
 sub _readmarcmaker {
     my $marc = shift;
-    my $handle = $marc->[0]{handle};
-    my $increment = $marc->[0]{increment}; #pick out increment from the object
+    my $handle = $marc->[0]{'handle'};
+    my $increment = $marc->[0]{'increment'}; #pick out increment from the object
     my $recordcount = 0;
       #Set the file input separator to null, which is the same as 
       #a blank line. A blank line separates individual MARC records
@@ -199,21 +199,21 @@ sub openmarc {
     my $params=shift;
     my $file=$params->{file};
     if (not(-e $file)) {carp "File \"$file\" doesn't exist"; return} 
-    $marc->[0]{format}=$params->{format}; #store format in object
+    $marc->[0]{'format'}=$params->{'format'}; #store format in object
     my $totalrecord;
-    $marc->[0]{increment}=$params->{increment}; #store increment in the object
-    unless ($marc->[0]{format}) {$marc->[0]{format}="usmarc"}; #default to usmarc
+    $marc->[0]{'increment'}=$params->{'increment'}; #store increment in the object
+    unless ($marc->[0]{'format'}) {$marc->[0]{'format'}="usmarc"}; #default to usmarc
     open (*file, $file);
-    $marc->[0]{handle}=\*file; #store filehandle in object
-    if ($marc->[0]{format} =~ /usmarc/oi) {
+    $marc->[0]{'handle'}=\*file; #store filehandle in object
+    if ($marc->[0]{'format'} =~ /usmarc/oi) {
 	$totalrecord = _readmarc($marc);
     }
-    elsif ($marc->[0]{format} =~ /marcmaker/oi) {
+    elsif ($marc->[0]{'format'} =~ /marcmaker/oi) {
 	$totalrecord = _readmarcmaker($marc);
     }
     else {
 	close *file;
-	carp "Unrecognized format $marc->[0]{format}";
+	carp "Unrecognized format $marc->[0]{'format'}";
 	return;
     }
     print "read in $totalrecord records\n" if $DEBUG;
@@ -226,10 +226,10 @@ sub openmarc {
 ####################################################################
 sub closemarc {
     my $marc = shift;
-    $marc->[0]{increment}=0;
-    if (not($marc->[0]{handle})) {carp "There isn't a MARC file to close"; return}
-    close $marc->[0]{handle};
-    $marc->[0]{handle}=undef;
+    $marc->[0]{'increment'}=0;
+    if (not($marc->[0]{'handle'})) {carp "There isn't a MARC file to close"; return}
+    close $marc->[0]{'handle'};
+    $marc->[0]{'handle'}=undef;
 }
 
 ####################################################################
@@ -242,12 +242,12 @@ sub nextmarc {
     my $marc=shift;
     my $increment=shift;
     my $totalrecord;
-    if (not($marc->[0]{handle})) {carp "There isn't a MARC file open"; return}
-    if ($increment) {$marc->[0]{increment}=$increment}
-    if ($marc->[0]{format} =~ /usmarc/oi) {
+    if (not($marc->[0]{'handle'})) {carp "There isn't a MARC file open"; return}
+    if ($increment) {$marc->[0]{'increment'}=$increment}
+    if ($marc->[0]{'format'} =~ /usmarc/oi) {
 	$totalrecord = _readmarc($marc);
     }
-    elsif ($marc->[0]{format} =~ /marcmaker/oi) {
+    elsif ($marc->[0]{'format'} =~ /marcmaker/oi) {
 	$totalrecord = _readmarcmaker($marc);
     }
     else {return}   
@@ -451,49 +451,49 @@ sub output {
     my $args=shift;
     my $output = "";
 
-    if ($args->{format} =~ /marc$/oi) {
+    if ($args->{'format'} =~ /marc$/oi) {
 	$output = _writemarc($marc,$args);
     }
-    elsif ($args->{format} =~ /marcmaker$/oi) {
+    elsif ($args->{'format'} =~ /marcmaker$/oi) {
 	$output = _marcmaker($marc,$args);
     }
-    elsif ($args->{format} =~ /ascii$/oi) {
+    elsif ($args->{'format'} =~ /ascii$/oi) {
 	$output = _marc2ascii($marc,$args);
     }
-    elsif ($args->{format} =~ /html$/oi) {
+    elsif ($args->{'format'} =~ /html$/oi) {
         $output .= "<html><body>";
 	$output .= _marc2html($marc,$args);
         $output .="</body></html>";
     }
-    elsif ($args->{format} =~ /html_header$/oi) {
+    elsif ($args->{'format'} =~ /html_header$/oi) {
 	$output = "<html><body>\n";
     }
-    elsif ($args->{format} =~ /html_body$/oi) {
+    elsif ($args->{'format'} =~ /html_body$/oi) {
         $output =_marc2html($marc,$args);
     }
-    elsif ($args->{format} =~ /html_footer$/oi) {
+    elsif ($args->{'format'} =~ /html_footer$/oi) {
 	$output = "\n</body></html>";
     }
-    elsif ($args->{format} =~ /xml$/oi) {
+    elsif ($args->{'format'} =~ /xml$/oi) {
         $output .="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\n<marc>\n\n";
 	$output .= _marc2xml($marc,$args);
         $output .= "\n</marc>";
     }
-    elsif ($args->{format} =~ /xml_header$/oi) {
+    elsif ($args->{'format'} =~ /xml_header$/oi) {
         $output .="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\n<marc>\n\n";
     }
-    elsif ($args->{format} =~ /xml_body$/oi) {
+    elsif ($args->{'format'} =~ /xml_body$/oi) {
 	$output=_marc2xml($marc,$args);
     }
-    elsif ($args->{format} =~ /xml_footer$/oi) {
+    elsif ($args->{'format'} =~ /xml_footer$/oi) {
 	$output="\n</marc>";
     }
-    elsif ($args->{format} =~ /urls$/oi) {
+    elsif ($args->{'format'} =~ /urls$/oi) {
         $output .= "<html>\n<head><title>URLS in ".$args->{file}."</title></head>\n<body>\n";
 	$output .= _urls($marc,$args);
         $output .="</body></html>";
     }
-    elsif ($args->{format} =~ /isbd$/oi) {
+    elsif ($args->{'format'} =~ /isbd$/oi) {
 	$output = _isbd($marc,$args);
     }
     if ($args->{file}) {
@@ -887,14 +887,14 @@ MARC.pm - Perl extension to manipulate B<MA>chine B<R>eadable B<C>ataloging reco
 
 =head1 SYNOPSIS
 
- use MARC 0.71;
+ use MARC 0.82;
 
  $x=MARC->new("mymarcfile.mrc");
- $x->output({file=>">my_text.txt",format=>"ascii"});
- $x->output({file=>">my_marcmaker.mkr",format=>"marcmaker"});
- $x->output({file=>">my_html.html",format=>"html"});
- $x->output({file=>">my_xml.xml",format=>"xml"});
- $x->output({file=>">my_urls.html",format=>"urls"});
+ $x->output({file=>">my_text.txt",'format'=>"ascii"});
+ $x->output({file=>">my_marcmaker.mkr",'format'=>"marcmaker"});
+ $x->output({file=>">my_html.html",'format'=>"html"});
+ $x->output({file=>">my_xml.xml",'format'=>"xml"});
+ $x->output({file=>">my_urls.html",'format'=>"urls"});
  print $x->length();
 
 =head1 DESCRIPTION
@@ -944,7 +944,7 @@ MARC -> URLS : This conversion will extract URLs from a batch of MARC records. T
 The module is provided in standard CPAN distribution format. It will
 extract into a directory MARC-version with any necessary subdirectories.
 Change into the MARC top directory. Download the latest version from 
-http://libstaff.lib.odu.edu/depts/systems/iii/scripts/MARCpm/MARC-08.TGZ 
+ftp://libstaff.lib.odu.edu/pub/MARCpm 
 
 =item Unix
 
@@ -1039,12 +1039,12 @@ You can also use the optional I<file> and I<format> parameters to create and pop
 Opens a specified file for reading data into a MARC object. If no format is specified openmarc() will default to USMARC. The I<increment> parameter defines how many records you would like to read from the file. If no I<increment> is defined then the file will just be opened, and no records will be read in. I I<increment> is set to -1 then the entire file will be read in.
 
     $x = new MARC;
-    $x->openmarc({file=>"mymarc.dat",format=>"usmarc",increment=>"1"});
-    $x->openmarc({file=>"mymarcmaker.mkr",format=>"marcmaker",increment=>"5"});
+    $x->openmarc({file=>"mymarc.dat",'format'=>"usmarc",increment=>"1"});
+    $x->openmarc({file=>"mymarcmaker.mkr",'format'=>"marcmaker",increment=>"5"});
 
 note: openmarc() will return the amount of records read in. For example:
 
-    $y=$x->openmarc({file=>"mymarc.dat",format=>"usmarc",increment=>"5"});
+    $y=$x->openmarc({file=>"mymarc.dat",'format'=>"usmarc",increment=>"5"});
     print "Read in $y records!";
 
 =head2 nextmarc()
@@ -1166,25 +1166,25 @@ Valid I<format> values currently include usmarc, marcmaker, ascii, html, xml, ur
 
 MARC
 
-    $x->output({file=>">mymarc.dat",format=>"usmarc"});
-    $x->output({file=>">mymarc.dat",format=>"usmarc",records=>\@records});
-    $y=$x->output({format=>"usmarc"}); #put the output into $y
+    $x->output({file=>">mymarc.dat",'format'=>"usmarc"});
+    $x->output({file=>">mymarc.dat",'format'=>"usmarc",records=>\@records});
+    $y=$x->output({'format'=>"usmarc"}); #put the output into $y
 
 =item *
 
 MARCMaker
 
-    $x->output({file=>">mymarcmaker.mkr",format=>"marcmaker"});
-    $x->output({file=>">mymarcmaker.mkr",format=>"marcmaker",records=>\@records});
-    $y=$x->output({format=>"marcmaker"}); #put the output into $y
+    $x->output({file=>">mymarcmaker.mkr",'format'=>"marcmaker"});
+    $x->output({file=>">mymarcmaker.mkr",'format'=>"marcmaker",records=>\@records});
+    $y=$x->output({'format'=>"marcmaker"}); #put the output into $y
 
 =item *
 
 ASCII
 
-    $x->output({file=>">myascii.txt",format=>"ascii"});
-    $x->output({file=>">myascii.txt",format=>"ascii",records=>\@records});
-    $y=$x->output({format=>"ascii"}); #put the output into $y
+    $x->output({file=>">myascii.txt",'format'=>"ascii"});
+    $x->output({file=>">myascii.txt",'format'=>"ascii",records=>\@records});
+    $y=$x->output({'format'=>"ascii"}); #put the output into $y
 
 =item *
 
@@ -1192,38 +1192,38 @@ HTML
 
 The HTML output method has some additional parameters. I<fields> which if set to "all" will output all of the fields. Or you can pass the tag number and a label that you want to use for that tag. This will result in HTML output that only contains the specified tags, and will use the label in place of the MARC code.
 
-    $x->output({file=>">myhtml.html",format=>"html",fields=>"all"});
+    $x->output({file=>">myhtml.html",'format'=>"html",fields=>"all"});
         #this will only output the 100 and 245 fields, with the 
 	#labels "Title: " and "Author: "
-    $x->output({file=>">myhtml.html",format=>"html",
+    $x->output({file=>">myhtml.html",'format'=>"html",
                 245=>"Title: ",100=>"Author: "});    
-    $y=$x->output({format=>"html"});
+    $y=$x->output({'format'=>"html"});
 
 If you want to build the HTML file in stages, there are three other I<format> values available to you: 1) "html_header", 2) "html_body", and 3) "html_footer". Be careful to use the >> append when adding to a file though!
 
-    $x->output({file=>">myhtml.html",format=>"html_header"}); 
-    $x->output({file=>">>myhtml.html",format=>"html_body",fields=>"all"});
-    $x->output({file=>">>myhtml.html",format=>"html_footer"});
+    $x->output({file=>">myhtml.html",'format'=>"html_header"}); 
+    $x->output({file=>">>myhtml.html",'format'=>"html_body",fields=>"all"});
+    $x->output({file=>">>myhtml.html",'format'=>"html_footer"});
 
 =item *
 
 XML
 
-    $x->output({file=>">myxml.xml",format=>"xml"});
-    $y=$x->output({format=>"xml"});
+    $x->output({file=>">myxml.xml",'format'=>"xml"});
+    $y=$x->output({'format'=>"xml"});
 
 Similar to the HTML output, the XML output has three different formats for creating the XML file in stages. Again, be careful to use the >> append where necessary.
 
-    $x->output({file=>">myxml.xml",format=>"xml_header"});
-    $x->output({file=>">>myxml.xml",format=>"xml_body"});
-    $x->output({file=>">>myxml.xml",format=>"xml_footer"});
+    $x->output({file=>">myxml.xml",'format'=>"xml_header"});
+    $x->output({file=>">>myxml.xml",'format'=>"xml_body"});
+    $x->output({file=>">>myxml.xml",'format'=>"xml_footer"});
 
 =item *
 
 URLS
 
-    $x->output({file=>"urls.html",format=>"urls"});
-    $y=$x->output({format=>"urls"});
+    $x->output({file=>"urls.html",'format'=>"urls"});
+    $y=$x->output({'format'=>"urls"});
 
 =item *
 
@@ -1231,8 +1231,8 @@ ISBD
 
 An experimental output format that attempts to mimic the ISBD.
 
-    $x->output({file=>"isbd.txt",format=>"isbd"});
-    $y=$x->output({format=>"isbd"});
+    $x->output({file=>"isbd.txt",'format'=>"isbd"});
+    $y=$x->output({'format'=>"isbd"});
 
 =back
 
@@ -1249,7 +1249,7 @@ This example will read in the complete contents of a MARC file called "mymarc.da
     #!/usr/bin/perl
     use MARC;
     $x = MARC->new("mymarc.dat","usmarc");
-    $x->output({file=>"myxml.xml",format=>"xml");
+    $x->output({file=>"myxml.xml",'format'=>"xml");
 
 =item *
 
@@ -1258,13 +1258,13 @@ The MARC object occupies a fair amount of working memory, and you may want to do
     #!/usr/bin/perl
     use MARC;
     $x = new MARC;
-    $x->openmarc({file=>"mymarc.dat",format=>"usmarc"});
-    $x->output({file=>">myxml.xml",format=>"xml_header"});
+    $x->openmarc({file=>"mymarc.dat",'format'=>"usmarc"});
+    $x->output({file=>">myxml.xml",'format'=>"xml_header"});
     while ($x->nextmarc(1)) {
-	$x->output({file=>">>myxml.xml",format=>"xml_body"});
+	$x->output({file=>">>myxml.xml",'format'=>"xml_body"});
 	$x->deletemarc(); #empty the object for reading in another
     }        
-    $x->output({file=>"myxml.xml",format=>"xml_footer"});
+    $x->output({file=>"myxml.xml",'format'=>"xml_footer"});
 
 =item *
 
@@ -1299,7 +1299,7 @@ Perhaps you have a tab delimited text file of data for online journals you have 
 		      value=>[u=>"http://www.djnr.com",z=>"Connect"]});
     }
     close INPUT_FILE;
-    $x->output({file=>">dowjones.mrc",format=>"usmarc"})
+    $x->output({file=>">dowjones.mrc",'format'=>"usmarc"})
 
 =back
 
@@ -1322,7 +1322,7 @@ perl(1), MARC http://lcweb.loc.gov/marc , XML http://www.w3.org/xml .
 Copyright (C) 1999, Bearden, Birthisel, McFadden, Summers. All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself. 4 October 1999.
+under the same terms as Perl itself. 6 October 1999.
 
 =cut
 

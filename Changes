@@ -51,3 +51,8 @@ Revision history for Perl extension MARC.
 	- update CPAN doc files: Changes, README, Makefile.PL
 	- add isbd to t/test1.t
 
+0.82  Wed Oct  6 13:30:22 CDT 1999
+	- Win32 Makefile.PL improvements including automatic html install
+	- Added single quotes to hash keys in MARC.pm and t/test1.t to
+	  eliminate nuisance warnings from Perl 5.004.
+

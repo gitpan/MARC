@@ -77,23 +77,23 @@ unless (is_ok ($x = MARC->new ($file))) {			# 2
 is_ok (2 == $x->length);					# 3
 
    #Output the MARC object to an ascii file
-is_ok ($x->output({file=>">output.txt",format=>"ASCII"}));	# 4
+is_ok ($x->output({file=>">output.txt",'format'=>"ASCII"}));	# 4
 
    #Output the MARC object to an html file
-is_ok ($x->output({file=>">output.html",format=>"HTML"}));	# 5
+is_ok ($x->output({file=>">output.html",'format'=>"HTML"}));	# 5
 
    #Output the MARC object to an xml file
-is_ok ($x->output({file=>">output.xml",format=>"XML"}));	# 6
+is_ok ($x->output({file=>">output.xml",'format'=>"XML"}));	# 6
 
    #Output the MARC object to an url file
-is_ok ($x->output({file=>">output.urls",format=>"URLS"}));	# 7
+is_ok ($x->output({file=>">output.urls",'format'=>"URLS"}));	# 7
 
    #Output the MARC object to an isbd file
-is_ok ($x->output({file=>">output.isbd",format=>"ISBD"}));	# 8
+is_ok ($x->output({file=>">output.isbd",'format'=>"ISBD"}));	# 8
 
    #Output the MARC object to an html file with titles
 is_ok ($x->output({file=>">output2.html",
-                   format=>"HTML","245"=>"TITLE:"}));		# 9
+                   'format'=>"HTML","245"=>"TITLE:"}));		# 9
 
 is_ok (-s 'output.txt');					# 10
 is_ok (-s 'output.html');					# 11
@@ -105,7 +105,7 @@ is_ok ($size1 = -s 'output2.html');				# 15
 
    #Append the MARC object to an html file with titles
 is_ok ($x->output({file=>">>output2.html",
-                   format=>"HTML","245"=>"TITLE:"}));		# 16
+                   'format'=>"HTML","245"=>"TITLE:"}));		# 16
 
 if ($naptime) {
     print "++++ page break\n";
@@ -117,7 +117,7 @@ $size2 -= ($size1 + $size1);
 is_bad (($size2 > 5) || ($size2 < -5));				# 18
 print "size1=$size1, size2=$size2\n";
 
-is_ok ($y = $x->output({format=>"HTML","245"=>"TITLE:"}));	# 19
+is_ok ($y = $x->output({'format'=>"HTML","245"=>"TITLE:"}));	# 19
 is_ok ($size2 = length ($y));					# 20
 $size2 -= $size1;
 is_bad (($size2 > 8) || ($size2 < -8));				# 21
