@@ -1,0 +1,53 @@
+0.3  Mon Aug 23 19:39:00 1999
+
+0.4  Sun Sep  5 13:49:00 1999
+
+0.5  Sun Sep  5 19:45:00 1999
+
+0.6  Mon Sep  6 18:17:00 1999
+	- consolidate into single file
+
+-------------------------------------------------------------
+Revision history for Perl extension MARC.
+
+0.01  Tue Sep  7 10:48:10 1999
+	- original version; created by h2xs 1.18
+	- linux command: h2xs -A -X -n MARC
+
+0.61  Tue Sep  7 12:56:23 CDT 1999
+	- convert version 0.6 into CPAN format (lots of little changes)
+
+0.62  Fri Sep 10 05:18:00 1999
+	- revised datastructure to hash of tags plus non-tag elements
+	  like 'array' which serve as structured views into data
+
+0.63  Sun Sep 12 20:38:00 1999
+	- permit incremental processing to reduce memory footprint
+
+0.65  Fri Sep 17 08:07:42 1999
+	- add openmarc,nextmarc,closemarc,deletemarc
+
+0.7   Sun Sep 21 07:15:00 1999
+	- major upgrade: revise new for incremental reads and tag maps
+	- add selectmarc,searchmarc, createrecord, _joinfield, addfield
+	- add error processing and use Carp
+	- add header/body/footer outputs
+	- revise documentation
+
+0.71  Wed Sep 22 15:50:31 1999
+	- compute @tags once in _marc2html, fix $outputall detection
+	- add Win32 test and install
+	- t/test1.t uses new output file spec, tests append & $var
+
+0.72  Fri Sep 24 07:42:00 1999
+	- add getvalue
+	- add doc example: xml_header, xml_body, xml_footer
+	- add doc example: createrecord, addfield
+
+0.80  Sun Oct  3 17:14:00 1999
+	- add isbd and unimarc
+
+0.81  Mon Oct  4 22:25:17 CDT 1999
+	- update CPAN doc files: Changes, README, Makefile.PL
+	- add isbd to t/test1.t
+

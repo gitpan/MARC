@@ -1,0 +1,8 @@
+Changes
+MANIFEST
+MARC.pm
+Makefile.PL
+README
+README.txt
+t/test1.t
+t/marc.dat
