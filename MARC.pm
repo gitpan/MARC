@@ -4,7 +4,7 @@ use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST);
 
-$VERSION = '1.08';
+$VERSION = '1.09';
 $MARC::DEBUG = 0;
 $MARC::TEST = 0;
 
@@ -1946,15 +1946,16 @@ sub createrecord { # rec
 ####################################################################
 sub nextrec {
     my $marcrec=shift;
-    if (not($marcrec->{'handle'})) {
+		my $string=shift;
+    if (not($marcrec->{'handle'}) && not($string)) {
 	mycarp "There isn't a MARC file open"; 
 	return;
     }
     if ($marcrec->{'format'} =~ /usmarc/oi) {
-	return  _readmarc($marcrec);
+	return  _readmarc($marcrec,$string);
     }
     elsif ($marcrec->{'format'} =~ /marcmaker/oi) {
-	return _readmarcmaker($marcrec);
+	return _readmarcmaker($marcrec,$string);
     }
     else {return (undef,-3)}   
 }

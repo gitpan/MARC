@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.07, 23 April 2000
+VERSION=1.09, 29 June 2000 
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -137,7 +137,7 @@ may now create different output from the same source data.
 NOTES:
 
 Please let us know if you run into any difficulties using MARC.pm--
-e'd be happy to try to help. Also, please contact us if you notice any
+we'd be happy to try to help. Also, please contact us if you notice any
 bugs, or if you would like to suggest an improvement/enhancement. Email
 addresses are listed at the bottom of this page.
 
@@ -152,6 +152,7 @@ AUTHORS:
 
     Chuck Bearden cbearden@rice.edu
     Bill Birthisel wcbirthisel@alum.mit.edu
+		Patrick Hochstenbach pat@isiserv.rug.ac.be
     Charles McFadden chuck@vims.edu
     Ed Summers esummers@odu.edu
     Derek Lane dereklane@pobox.com
