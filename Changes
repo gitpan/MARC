@@ -274,3 +274,6 @@ Revision history for Perl extension MARC.
 	- Perl 5.6.0 warns on "join (//,", use "join (''," instead.
 	- fixes to $naptime and $testfile in t/test5.t
 	- openmarc did not set 'handle' and 'format' for MARC::Rec
+
+1.08   Tue Jun 13 05:48:36 PDT 2000 <Summers>
+  - changed documentation to reflect new location of web interface

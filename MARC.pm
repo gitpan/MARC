@@ -4,7 +4,7 @@ use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST);
 
-$VERSION = '1.07';
+$VERSION = '1.08';
 $MARC::DEBUG = 0;
 $MARC::TEST = 0;
 
@@ -3149,9 +3149,7 @@ MARC E<lt>-E<gt> DC/RDF (Dublin Core Metadata encoded in the Resource Descriptio
 =head2 Web Interface
 
 A web interface to MARC.pm is available at
-http://libstaff.lib.odu.edu/cgi-bin/marc.cgi where you can upload records and
-observe the results. If you'd like to check out the cgi script take a look at
-http://libstaff.lib.odu.edu/depts/systems/iii/scripts/MARCpm/marc-cgi.txt However, to get the full functionality you will want to install MARC.pm on your server or PC.
+http://marcpm.sourceforge.net/cgi-bin/converter.cgi where you can upload records and observe the results. If you'd like to check out the cgi script take a look at http://marcpm.sourceforge.net/documentation/marcpm/converter.txt However, to get the full functionality you will want to install MARC.pm on your server or PC.
 
 =head2 Option Templates
 
