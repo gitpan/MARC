@@ -6,3 +6,5 @@ README
 README.txt
 t/test1.t
 t/marc.dat
+eg/addlocal.pl
+eg/microlif.001

@@ -80,5 +80,13 @@ Revision history for Perl extension MARC.
 	  $x->closemarc() || die;
 
 0.9   Sun Oct 17 19:48:00 EST 1999
-	- modified deletemarc() to support deleting specified fields and subfields
+	- modified deletemarc() to support deleting specified fields and
+	  subfields
 	- modified addfield() to support adding fields in tag order
+
+0.91  Tue Oct 19 18:01:43 CDT 1999
+	- add demo addlocal.pl, microlif.001, and directory eg
+	- closemarc() returns results of close()
+	- filter '\r' and '\cZ' from binary input stream
+	- fix "delete all records" bug
+

@@ -9,7 +9,7 @@ unless ($^O eq "MSWin32") {
         'NAME'	=> 'MARC',
         'VERSION_FROM' => 'MARC.pm', # finds $VERSION
         'SKIP'	=> [qw(tool_autosplit)],
-        'clean'	=> {FILES => "t/output*.* output*.*"},
+        'clean'	=> {FILES => "t/output*.* output*.* eg/*.txt eg/*.002"},
     );
     exit;
 }
@@ -29,9 +29,10 @@ my @HTML_FILES = "MARC";
 
     # probably should auto-generate @cleanfiles
 my @cleanfiles = qw( output.txt output.html output.xml output.urls output2.html
-		    t/output.txt t/output.html t/output.xml t/output.urls
-		    t/output2.html output.isbd t/output.isbd output.mkr
-		    t/output.mkr
+		     t/output.txt t/output.html t/output.xml t/output.urls
+		     t/output2.html output.isbd t/output.isbd output.mkr
+		     t/output.mkr eg/microlif.002 eg/microlif.txt
+		     eq/missing.txt
 		  );
 
 print <<INTRO3;

@@ -3,7 +3,7 @@ package MARC;
 use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG);
-$VERSION = '0.9';
+$VERSION = '0.91';
 $DEBUG = 0;
 
 require Exporter;
@@ -79,7 +79,8 @@ sub _readmarc {
     local $/ = "\035";	# cf. TPJ #14
     local $^W = 0;	# no warnings
     while (($increment==-1 || $recordcount<$increment) and my $line=<$handle>) {
-	$line=~s/\n//go;
+	$line=~s/[\n\r\cZ]//og;
+	last unless $line;
 	my @d = ();
 	my $record={};
 	$record->{"array"}=[];
@@ -231,9 +232,9 @@ sub closemarc {
     my $marc = shift;
     $marc->[0]{'increment'}=0;
     if (not($marc->[0]{'handle'})) {carp "There isn't a MARC file to close"; return}
-    close $marc->[0]{'handle'};
+    my $ok = close $marc->[0]{'handle'};
     $marc->[0]{'handle'}=undef;
-    return 1;
+    return $ok;
 }
 
 ####################################################################
@@ -266,9 +267,8 @@ sub nextmarc {
 sub deletemarc {
     my $marc=shift;
     my $params=shift;
-    my $delrecords=$params->{record} || carp "error $!";
+    my @delrecords=$params->{record} || (1..$#$marc);
        #if records parameter not passed set to all records in MARC object
-    if (not($delrecords)) {@$delrecords=(1..$#$marc)}
     my $field=$params->{field};
     my $subfield=$params->{subfield};
     my $occurence=$params->{occurence};
@@ -281,7 +281,7 @@ sub deletemarc {
 	my $count=0;
 	foreach my $record (@$marc) {
 	    my $match=0;
-	    foreach my $delelement (@$delrecords) {
+	    foreach my $delelement (@delrecords) {
 		if ($delelement==$count) {$match=1;last;}
 	    }
 	    if (not($match)) {push(@newmarc,$record)}
@@ -295,7 +295,7 @@ sub deletemarc {
     #delete fields
     elsif ($field and not($subfield)) {
 	for (my $record=1; $record<=$#$marc; $record++) {
-	    foreach my $delelement (@$delrecords) {
+	    foreach my $delelement (@delrecords) {
 		if ($delelement != $record) {next}
 		if ($marc->[$record]{$field}) {
 		    foreach my $fieldref1 (@{$marc->[$record]{$field}{field}}) {
@@ -318,7 +318,7 @@ sub deletemarc {
     #delete subfields
     elsif ($subfield) {
 	for (my $record=1; $record<=$#$marc; $record++) {
-	    foreach my $delelement (@$delrecords) {
+	    foreach my $delelement (@delrecords) {
 		if ($delelement != $record) {next}
 		if ($marc->[$record]{$field}{$subfield}) {
 		    foreach my $subfieldref (@{$marc->[$record]{$field}{$subfield}}) {
@@ -587,6 +587,7 @@ sub _writemarc {
 	my $record = $marc->[$i];
 	#Reset variables
         my $position=undef; my $directory=undef; my $fieldstream=undef; 
+####        my $position=0; my $directory=undef; my $fieldstream=undef; 
 	my $leader=$record->{array}[0][1];
 	foreach my $field (@{$record->{array}}) {
 	    my $tag = $field->[0];
@@ -948,6 +949,7 @@ sub addfield {
 sub _offset{
     my $value=shift;
     my $digits=shift;
+    print "DEBUG: _offset value = $value, digits = $digits\n" if ($DEBUG);
     my $x=CORE::length($value);
     $x=$digits-$x;
     $x="0"x$x."$value";
@@ -970,7 +972,7 @@ MARC.pm - Perl extension to manipulate B<MA>chine B<R>eadable B<C>ataloging reco
 
 =head1 SYNOPSIS
 
- use MARC 0.84;
+ use MARC 0.91;
 
  $x=MARC->new("mymarcfile.mrc");
  $x->output({file=>">my_text.txt",'format'=>"ascii"});
@@ -1413,7 +1415,7 @@ perl(1), MARC http://lcweb.loc.gov/marc , XML http://www.w3.org/xml .
 Copyright (C) 1999, Bearden, Birthisel, McFadden, Summers. All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself. 12 October 1999.
+under the same terms as Perl itself. 19 October 1999.
 
 =cut
 
