@@ -1,29 +1,9 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.15, 30 March 2002 
+VERSION=1.13, 30 June 2000 
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
 to read them on Win32. README.txt is README with CRLF.
-
-IMPORTANT: 
-
-Perl folks are encouraged to check out MARC::Record (also on CPAN) which
-provides a streamlined, object oriented interface to MARC data. MARC/Perl
-developers are encouraged to look at MARC::Record because it incorporates
-some lessons learned during the development of MARC.pm. MARC.pm started out
-with the object being a collection or 'batch' of MARC records. Since the 
-underlying data structure that holds the MARC data is quite large some people
-who were processing large batches inadvertently got into some trouble with 
-working memory :) Later MARC.pm was retrofitted so that the object could be
-viewed as a single record (not a batch). Unfortunately serving both the 'batch'
-and 'single record' camps lead to a complicated API, and some confusing 
-code that is rather hard to maintain. I guess you've got to build one 
-to throw away after all....and maybe even two!
-
-Enter MARC::Record which provides a clean object oriented interface to the
-data found in a single record, and which should prove to be easier to extend
-...But, MARC.pm does have a few bells and whistles which aren't in 
-MARC::Record, so if you want to use them, and can find the knobs, read on!
 
 DESCRIPTION:
 
@@ -179,7 +159,7 @@ AUTHORS:
 
 COPYRIGHT
 
-Copyright (C) 1999, 2000, 2001 Bearden, Birthisel, Hochstenbach, Lane, McFadden, 
+Copyright (C) 1999, 2000 Bearden, Birthisel, Hochstenbach, Lane, McFadden, 
 and Summers.  All rights reserved. This module is free software; you can 
 redistribute it and/or modify it under the same terms as Perl itself.
 Portions Copyright (C) 1999, 2000 Duke University, Lane.
