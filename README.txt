@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.09, 29 June 2000 
+VERSION=1.10, 30 June 2000 
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -152,13 +152,14 @@ AUTHORS:
 
     Chuck Bearden cbearden@rice.edu
     Bill Birthisel wcbirthisel@alum.mit.edu
+		Patrick Hochstenbach pat@isiserv.rug.ac.be
     Charles McFadden chuck@vims.edu
     Ed Summers esummers@odu.edu
     Derek Lane dereklane@pobox.com
 
 COPYRIGHT
 
-Copyright (C) 1999, 2000 Bearden, Birthisel, Lane, McFadden, and Summers.
-All rights reserved. This module is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself.
+Copyright (C) 1999, 2000 Bearden, Birthisel, Hochstenbach, Lane, McFadden, and 
+Summers.  All rights reserved. This module is free software; you can 
+redistribute it and/or modify it under the same terms as Perl itself.
 Portions Copyright (C) 1999, 2000 Duke University, Lane.

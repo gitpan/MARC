@@ -283,4 +283,10 @@ Revision history for Perl extension MARC.
 	  shifting off and returning string values that were passed, so 
 	  it wasn't possible to read a MARC::Rec from a scalar instead of 
   	a handle.
-	  	
+	  
+1.10   Fri Jun 30 07:56:19 PDT 2000  
+	- updated nextrec() to use operator style not instead of function 
+	style for backwards compatibility. May need to look at other usage 
+	of not throughout MARC.pm.
+
+
