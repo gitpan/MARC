@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=0.96, 03 November 1999
+VERSION=0.97, 05 November 1999
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad

@@ -163,3 +163,8 @@ Revision history for Perl extension MARC.
 	- fix typos in pod2man and pod2html output
 	- fix test3.t like test1.t
 
+0.97   Fri Nov  5 17:44:15 CST 1999 <Birthisel>
+	- replace '%$' construct (4 places) which designates pseudo-hash
+	  in 5.005 and fails in 5.004. Detected by CPAN-Testers
+	- Add tests for deletemarc() subfield to t/test2.t
+

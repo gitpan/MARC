@@ -5,7 +5,7 @@ use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG 
 	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
 	    );
-$VERSION = '0.96';
+$VERSION = '0.97';
 $DEBUG = 0;
 
 require Exporter;
@@ -483,7 +483,7 @@ sub deletemarc {
 			    if ($fieldref1 == $fieldref2) {
 				$deletecount++;
 				splice @{$marc->[$record]{array}},$count,1;
-				delete %$marc->[$record]{$field};
+				delete $marc->[$record]{$field};
 			    }
 			    $count++;
 			}
@@ -508,7 +508,7 @@ sub deletemarc {
 				if ($$subfieldref eq $subfield2) {
 				    $deletecount++;
 				    splice @$fieldref2,$count-1,2;
-				    delete %$marc->[$record]{$field}{$subfield};
+				    delete $marc->[$record]{$field}{$subfield};
 				}
 				$count++
 			    }
@@ -1278,7 +1278,7 @@ sub _marc2html {
     my $newline = $args->{lineterm} || "\n";
     my $output = "";
     my $outputall = 1;
-    my @alltags = sort(keys(%$args));
+    my @alltags = sort(keys(%{$args}));
     my @tags = ();
     foreach my $tag (@alltags) {
         push (@tags, $tag) if ($tag =~ /^[0-9]/);
@@ -1305,7 +1305,7 @@ sub _marc2html {
 	else {
 	    foreach my $tag (@tags) {
 		foreach my $field (@{$j->{$tag}{field}}) {
-		    $output.=%$args->{$tag}." "._joinfield($field,$tag).
+		    $output.=$args->{$tag}." "._joinfield($field,$tag).
 			     "<br>$newline";
 		}
 	    }
@@ -2401,7 +2401,7 @@ perl(1), MARC http://lcweb.loc.gov/marc , XML http://www.w3.org/xml .
 
 Copyright (C) 1999, Bearden, Birthisel, Lane, McFadden, and Summers.
 All rights reserved. This module is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself. 3 November 1999.
+it and/or modify it under the same terms as Perl itself. 5 November 1999.
 Portions Copyright (C) 1999, Duke University, Lane.
 
 =cut

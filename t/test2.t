@@ -9,7 +9,7 @@ use lib '.','./t';	# for inheritance and Win32 test
 
 ######################### We start with some black magic to print on failure.
 
-BEGIN { $| = 1; print "1..49\n"; }
+BEGIN { $| = 1; print "1..54\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use MARC 0.93;
 $loaded = 1;
@@ -205,4 +205,13 @@ is_ok($records[1] == 3);					# 47
 @records = $x->getvalue({record=>'2',field=>'020',delimiter=>'|'});
 is_ok(1 == scalar @records);					# 48
 is_ok($records[0] eq "|a8472236579|cnew data");			# 49
+
+is_ok(1 == $x->deletemarc({field=>'020',record=>2,subfield=>'c'}));	# 50
+@records=$x->searchmarc({field=>"020",subfield=>"c"});
+is_ok(1 == scalar @records);					# 51
+is_ok($records[0] == 3);					# 52
+
+@records = $x->getvalue({record=>'2',field=>'020',delimiter=>'|'});
+is_ok(1 == scalar @records);					# 53
+is_ok($records[0] eq "|a8472236579");				# 54
 
