@@ -174,3 +174,14 @@ Revision history for Perl extension MARC.
 	- moved binmode from _readmarc* to openmarc() and new() to get around
 	  unwanted seek on binmode in Win32 5.00402.
 
+0.99   Sun Nov 14 21:59:00 EST 1999
+        - created MARC::XML subclass to handle MARC<->XML conversions
+        - moved _marc2xml() from MARC.pm into MARC::XML
+
+0.991  Sun Nov 21 18:49:00 EST 1999
+        - removed MARC::XML specific pod from MARC.pm and added to MARC::XML
+
+1.00   Mon Nov 22 22:22:32 CST 1999
+	- add warnings for unsupported output formats
+	- return undef for output failure, test in place of XML
+

@@ -11,7 +11,7 @@ use lib '.','./t';	# for inheritance and Win32 test
 
 BEGIN { $| = 1; print "1..178\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use MARC 0.94;
+use MARC 1.00;
 $loaded = 1;
 print "ok 1\n";
 
@@ -98,8 +98,11 @@ is_ok ($x->output({file=>">output.txt",'format'=>"ASCII"}));	# 4
    #Output the MARC object to an html file
 is_ok ($x->output({file=>">output.html",'format'=>"HTML"}));	# 5
 
-   #Output the MARC object to an xml file
-is_ok ($x->output({file=>">output.xml",'format'=>"XML"}));	# 6
+   #Try to output the MARC object to an xml file
+my $quiet = $^W;
+$^W = 0;
+is_bad ($x->output({file=>">output.xml",'format'=>"XML"}));	# 6
+$^W = $quiet;
 
    #Output the MARC object to an url file
 is_ok ($x->output({file=>">output.urls",'format'=>"URLS"}));	# 7
@@ -116,7 +119,7 @@ is_ok ($x->output({file=>">output2.html",
 
 is_ok (-s 'output.txt');					# 11
 is_ok (-s 'output.html');					# 12
-is_ok (-s 'output.xml');					# 13
+is_bad (-e 'output.xml');					# 13
 is_ok (-s 'output.urls');					# 14
 
    #Append the MARC object to an html file with titles

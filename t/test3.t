@@ -11,7 +11,7 @@ use lib '.','./t';	# for inheritance and Win32 test
 
 BEGIN { $| = 1; print "1..79\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use MARCopt 0.93;		# check inheritance & export
+use MARCopt;		# check inheritance & export
 $loaded = 1;
 print "ok 1\n";
 
@@ -91,8 +91,11 @@ is_ok ($x->output({file=>">output.txt",'format'=>"ASCII"}));	# 4
    #Output the MARCopt object to an html file
 is_ok ($x->output({file=>">output.html",'format'=>"HTML"}));	# 5
 
-   #Output the MARCopt object to an xml file
-is_ok ($x->output({file=>">output.xml",'format'=>"XML"}));	# 6
+   #Try to output the MARCopt object to an xml file
+my $quiet = $^W;
+$^W = 0;
+is_bad ($x->output({file=>">output.xml",'format'=>"XML"}));	# 6
+$^W = $quiet;
 
    #Output the MARCopt object to an url file
 is_ok ($x->output({file=>">output.urls",'format'=>"URLS"}));	# 7
@@ -109,7 +112,7 @@ is_ok ($x->output({file=>">output2.html",
 
 is_ok (-s 'output.txt');					# 11
 is_ok (-s 'output.html');					# 12
-is_ok (-s 'output.xml');					# 13
+is_bad (-e 'output.xml');					# 13
 is_ok (-s 'output.urls');					# 14
 
    #Append the MARCopt object to an html file with titles

@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=0.98, 12 November 1999
+VERSION=1.00, 22 November 1999
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -116,6 +116,8 @@ Use the new marc_count() method instead.
 Version 0.93 adds character_set conversions to MarcMaker format reads and
 writes. The usmarc/ustext character maps are used by default, so existing
 files in that format will produce different results than earlier versions.
+
+Starting with version 1.00, the XML conversions are moved to MARC::XML.
 
 NOTES:
 

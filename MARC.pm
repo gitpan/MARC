@@ -5,7 +5,7 @@ use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG 
 	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
 	    );
-$VERSION = '0.98';
+$VERSION = '1.00';
 $DEBUG = 0;
 
 require Exporter;
@@ -961,20 +961,6 @@ sub output {
     elsif ($args->{'format'} =~ /html_footer$/oi) {
 	$output = "$newline</body></html>$newline";
     }
-    elsif ($args->{'format'} =~ /xml$/oi) {
-        $output .="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>$newline$newline<marc>$newline$newline";
-	$output .= _marc2xml($marc,$args);
-        $output .= "$newline</marc>";
-    }
-    elsif ($args->{'format'} =~ /xml_header$/oi) {
-        $output .="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>$newline$newline<marc>$newline$newline";
-    }
-    elsif ($args->{'format'} =~ /xml_body$/oi) {
-	$output=_marc2xml($marc,$args);
-    }
-    elsif ($args->{'format'} =~ /xml_footer$/oi) {
-	$output="$newline</marc>";
-    }
     elsif ($args->{'format'} =~ /urls$/oi) {
 	my $title = $args->{title} || "Untitled URLs";
         $output .= "<html><head><title>$title</title></head>$newline<body>$newline";
@@ -984,8 +970,19 @@ sub output {
     elsif ($args->{'format'} =~ /isbd$/oi) {
 	$output = _isbd($marc,$args);
     }
+    elsif ($args->{'format'} =~ /xml/oi) {
+	carp "XML formats are now handled by MARC::XML" if ($^W);
+	return;
+    }
+    elsif ($args->{'format'}) {
+	carp "Unrecognized format specified for output" if ($^W);
+	return;
+    }
     if ($args->{file}) {
-	if ($args->{file} !~ /^>/) {carp "Don't forget to use > or >>: $!"}
+	if ($args->{file} !~ /^>/) {
+	    carp "Don't forget to use > or >> with output file name";
+	    return;
+	}
 	open (OUT, "$args->{file}") || carp "Couldn't open file: $!";
         binmode OUT;
 	print OUT $output;
@@ -1313,49 +1310,6 @@ sub _marc2html {
 }
 
 ####################################################################
-# _marc2xml takes a MARC object as its input and converts it into  #
-# XML. The XML is returned as a string                             #
-####################################################################
-sub _marc2xml {
-    my $output;
-    my $marc=shift;
-    my $args=shift;
-    my $newline = $args->{lineterm} || "\n";
-    my @records;
-    if ($args->{records}) {@records=@{$args->{records}}}
-    else {for (my $i=1;$i<=$#$marc;$i++) {push(@records,$i)}}
-    foreach my $i (@records) {
-	my $record=$marc->[$i]; #cycle through each record
-	$output.="<record>$newline";
-	foreach my $fields (@{$record->{array}}) { #cycle through each field 
-	    my $tag=$fields->[0];
-	    if ($tag<10) { #no indicators or subfields
-	          #replace & < > with their corresponding entities 
-		my $value=$fields->[1];
-		$value=~s/&/&amp;/og; $value=~s/</&lt;/og; $value=~s/>/&gt;/og;
-		$output.=qq(<field type="$tag">$value</field>$newline);
-	    }
-	    else { #indicators and subfields
-		$output.=qq(<field type="$tag" i1="$fields->[1]" i2="$fields->[2]">$newline);
-		my @subfields = @{$fields}[3..$#{$fields}];		
-		while (@subfields) { #cycle through subfields
-		    my $subfield_type = shift(@subfields);
-		    my $subfield_value = shift(@subfields);
-		    $subfield_value=~s/&/&amp;/og;
-		    $subfield_value=~s/</&lt;/og;
-		    $subfield_value=~s/>/&gt;/og;
-		    $output .= qq(   <subfield type="$subfield_type">);
-		    $output .= qq($subfield_value</subfield>$newline);
-		} #finish cycling through subfields
-		$output .= qq(</field>$newline);
-	    } #finish tag test < 10
-	}
-	$output.="</record>$newline$newline"; #put an extra newline to separate records
-    }
-    return $output;
-}
-
-####################################################################
 # _urls() takes a MARC object as its input, and then extracts the  #
 # control# (MARC 001) and URLs (MARC 856) and outputs them as      #
 # hypertext links in an HTML page. This could then be used with a  #
@@ -1649,7 +1603,7 @@ MARC.pm - Perl extension to manipulate MAchine Readable Cataloging records.
 
 =head1 SYNOPSIS
 
-  use MARC 0.98;
+  use MARC;
 
 	# constructors
   $x=MARC->new();
@@ -1731,8 +1685,8 @@ this to create HTML bibliographies from a batch of MARC records.
 
 =item *
 
-MARC -> XML : The MARC to XML conversion creates an XML document that does not have a 
-I<Document Type Definition>. Fortunately, since XML does not require a DTD this is OK.
+MARC E<lt>-E<gt> XML : XML support is handled by MARC::XML which is a subclass of MARC.pm and is 
+also available for download from the CPAN.
 
 =item *
 
@@ -1784,7 +1738,7 @@ it into the right place during the install.
 
 =item *
 
-Support for other MARC formats.
+Support for other MARC formats (UKMARC, FINMARC, etc).
 
 =item *
 
@@ -1797,16 +1751,15 @@ Develop better error catching mechanisms.
 
 =item *
 
-Support for character conversions from MARC to Unicode ??
+Support for MARC E<lt>-E<gt> Unicode character conversions.
 
 =item *
 
-Managing MARC records that exceed 99999 characters in length (not
-uncommon for MARC AMC records)
+MARC E<lt>-E<gt> EAD (Encoded Archival Description) conversion?
 
 =item *
 
-MARC <-> DC/RDF conversion ??
+MARC E<lt>-E<gt> DC/RDF (Dublin Core Metadata encoded in the Resource Description Framework)?
 
 =back
 
@@ -1819,10 +1772,7 @@ http://libstaff.lib.odu.edu/depts/systems/iii/scripts/MARCpm/marc-cgi.txt Howeve
 
 =head2 Notes
 
-Please let us know if you run into any difficulties using MARC.pm--we'd be
-happy to try to help. Also, please contact us if you notice any bugs, or
-if you would like to suggest an improvement/enhancement. Email addresses 
-are listed at the bottom of this page.
+
 
 =head2 Option Templates
 
@@ -2173,7 +2123,7 @@ This example intitalized a new record, and added a 100 field and a 245 field. Fo
 
 Output is a multifunctional method for creating formatted output from a MARC object. There are three parameters I<file>, I<format>, I<records>. If I<file> is specified the output will be directed to that file. It is important to specify with E<gt> and E<gt>E<gt> whether you want to create or append the file! If no I<file> is specified then the results of the output will be returned to a variable (both variations are listed below). 
 
-Valid I<format> values currently include usmarc, marcmaker, ascii, html, xml, urls, and isbd. The optional I<records> parameter allows you to pass an array of record numbers which you wish to output. You must pass the array as a reference, hence the forward-slash in \@records below. If you do not include I<records> the output will default to all the records in the object. 
+Valid I<format> values currently include usmarc, marcmaker, ascii, html, urls, and isbd. The optional I<records> parameter allows you to pass an array of record numbers which you wish to output. You must pass the array as a reference, hence the forward-slash in \@records below. If you do not include I<records> the output will default to all the records in the object. 
 
 The I<lineterm> parameter can be used to override the line-ending default
 for any of the formats. I<MARCMaker> defaults to CRLF (the format was
@@ -2253,19 +2203,6 @@ If you want to build the HTML file in stages, there are four other I<format> val
 
 =item *
 
-XML
-
-    $x->output({file=>">myxml.xml",'format'=>"xml"});
-    $y=$x->output({'format'=>"xml"});
-
-Similar to the HTML output, the XML output has three different formats for creating the XML file in stages. Again, be careful to use the >> append where necessary.
-
-    $x->output({file=>">myxml.xml",'format'=>"xml_header"});
-    $x->output({file=>">>myxml.xml",'format'=>"xml_body"});
-    $x->output({file=>">>myxml.xml",'format'=>"xml_footer"});
-
-=item *
-
 URLS
 
     $x->output({file=>"urls.html",'format'=>"urls"});
@@ -2279,6 +2216,13 @@ An experimental output format that attempts to mimic the ISBD.
 
     $x->output({file=>"isbd.txt",'format'=>"isbd"});
     $y=$x->output({'format'=>"isbd"});
+
+=item *
+
+XML
+
+Roundtrip conversion between MARC and XML is handled by the subclass 
+MARC::XML. MARC::XML is available for download from the CPAN.
 
 =back
 
@@ -2317,27 +2261,25 @@ Here are a few examples to fire your imagination.
 
 =item * 
 
-This example will read in the complete contents of a MARC file called "mymarc.dat" and then output it as XML to a file called "myxml.xml".
+This example will read in the complete contents of a MARC file called "mymarc.dat" and then output it as a MARCMaker file called "mymkr.mkr".
 
     #!/usr/bin/perl
     use MARC;
-    $x = MARC->new("mymarc.dat","usmarc");
-    $x->output({file=>"myxml.xml",'format'=>"xml");
+    $x = MARC->new("mymarc.dat","marcmaker");
+    $x->output({file=>"mymkr.mkr",'format'=>"marcmaker");
 
 =item *
 
-The MARC object occupies a fair number of working memory, and you may want to do conversions on very large files. In this case you will want to use the openmarc(), nextmarc(), deletemarc(), and closemarc() methods to read in portions of the MARC file, do something with the record(s), remove them from the object, and then read in the next record(s). This example will read in one record at a time from a MARC file called "mymarc.dat" and convert it to XML. Note the use of formats "xml_header", "xml_body", and "xml_footer".
+The MARC object occupies a fair number of working memory, and you may want to do conversions on very large files. In this case you will want to use the openmarc(), nextmarc(), deletemarc(), and closemarc() methods to read in portions of the MARC file, do something with the record(s), remove them from the object, and then read in the next record(s). This example will read in one record at a time from a MARC file called "mymarc.dat" and convert it to a MARC Maker file called "myfile.mkr".
 
     #!/usr/bin/perl
     use MARC;
     $x = new MARC;
     $x->openmarc({file=>"mymarc.dat",'format'=>"usmarc"});
-    $x->output({file=>">myxml.xml",'format'=>"xml_header"});
     while ($x->nextmarc(1)) {
-	$x->output({file=>">>myxml.xml",'format'=>"xml_body"});
+	$x->output({file=>">>myfile.mkr",'format'=>"marcmaker"});
 	$x->deletemarc(); #empty the object for reading in another
     }        
-    $x->output({file=>"myxml.xml",'format'=>"xml_footer"});
 
 =item *
 
@@ -2378,27 +2320,38 @@ Perhaps you have a tab delimited text file of data for online journals you have 
 
 =back
 
+=head1 NOTES
+
+Please let us know if you run into any difficulties using MARC.pm--we'd be
+happy to try to help. Also, please contact us if you notice any bugs, or
+if you would like to suggest an improvement/enhancement. Email addresses 
+are listed at the bottom of this page.
+
+Development of MARC.pm and other library oriented Perl utilities is conducted on the 
+Perl4Lib listserv. Perl4Lib is an open list and is an ideal place to ask questions 
+about MARC.pm. Subscription information is available at http://www.vims.edu/perl4lib
+
 =head1 AUTHORS
 
 Chuck Bearden cbearden@rice.edu
 
 Bill Birthisel wcbirthisel@alum.mit.edu
 
+Derek Lane dereklane@pobox.com
+
 Charles McFadden chuck@vims.edu
 
 Ed Summers esummers@odu.edu
 
-Derek Lane dereklane@pobox.com
-
 =head1 SEE ALSO
 
-perl(1), MARC http://lcweb.loc.gov/marc , XML http://www.w3.org/xml .
+perl(1), http://lcweb.loc.gov/marc
 
 =head1 COPYRIGHT
 
 Copyright (C) 1999, Bearden, Birthisel, Lane, McFadden, and Summers.
 All rights reserved. This module is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself. 12 November 1999.
+it and/or modify it under the same terms as Perl itself. 22 November 1999.
 Portions Copyright (C) 1999, Duke University, Lane.
 
 =cut
