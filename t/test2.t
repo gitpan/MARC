@@ -91,59 +91,59 @@ unlink 'output.txt', 'output.html', 'output.xml', 'output.isbd',
    # Create the new MARC object. You can use any variable name you like...
    # Read the MARC file into the MARC object.
 
-unless (is_ok ($x = MARC->new($file3,"marcmaker"))) {		# 2
+unless (is_ok ($x = MARC->new($file3,"marcmaker"))) {		
     die "could not create MARC from $file3\n";
     # next test would die at runtime without $x
 }
 
 $MARC::TEST = 1; # so outputs have known dates for 005
-is_ok (8 == $x->marc_count);					# 3
+is_ok (8 == $x->marc_count);					
 
    #Output the MARC object to a marcmaker file with nolinebreak
 is_ok ($x->output({file=>">output.bkr",'format'=>"marcmaker",
-	nolinebreak=>'y'}));					# 4
-out_cmp ("output.bkr", $file2);					# 5
+	nolinebreak=>'y'}));					
+out_cmp ("output.bkr", $file2);					
 
 my $y;
-is_ok ($y = $x->output());					# 6
+is_ok ($y = $x->output());					
 
    #Output the MARC object to an ascii file
-is_ok ($x->output({file=>">output.txt",'format'=>"ASCII"}));	# 7
+is_ok ($x->output({file=>">output.txt",'format'=>"ASCII"}));	
 
    #Output the MARC object to a marcmaker file
-is_ok ($x->output({file=>">output2.bkr",'format'=>"marcmaker"}));	# 8
+is_ok ($x->output({file=>">output2.bkr",'format'=>"marcmaker"}));	
 
    #Output the MARC object to a marc file
-is_ok ($x->output({file=>">output.mkr",'format'=>"marc"}));	# 9
+is_ok ($x->output({file=>">output.mkr",'format'=>"marc"}));	
 
-out_cmp ("output.mkr", $file);					# 10
+out_cmp ("output.mkr", $file);					
 
 $MARC::TEST = 0; #minimal impact
 $^W = 0;
 my ($m000) = $x->getvalue({record=>'1',field=>'000'});
 my ($m001) = $x->getvalue({record=>'1',field=>'001'});
-is_ok ($m000 eq "01200nam  2200253 a 4500");			# 11
-is_ok ($m001 eq "tes96000001 ");				# 12
+is_ok ($m000 eq "01200nam  2200253 a 4500");			
+is_ok ($m001 eq "tes96000001 ");				
 
 my ($m002) = $x->getvalue({record=>'1',field=>'002'});
 my ($m003) = $x->getvalue({record=>'1',field=>'003'});
-is_bad (defined $m002);						# 13
-is_ok ($m003 eq "ViArRB");					# 14
+is_bad (defined $m002);						
+is_ok ($m003 eq "ViArRB");					
 
 my ($m004) = $x->getvalue({record=>'1',field=>'004'});
 my ($m005) = $x->getvalue({record=>'1',field=>'005'});
-is_bad (defined $m004);						# 15
-is_ok ($m005 eq "19960221075055.7");				# 16
+is_bad (defined $m004);						
+is_ok ($m005 eq "19960221075055.7");				
 
 my ($m006) = $x->getvalue({record=>'1',field=>'006'});
 my ($m007) = $x->getvalue({record=>'1',field=>'007'});
-is_bad (defined $m006);						# 17
-is_bad (defined $m007);						# 18
+is_bad (defined $m006);						
+is_bad (defined $m007);						
 
 my ($m008) = $x->getvalue({record=>'1',field=>'008'});
 my ($m009) = $x->getvalue({record=>'1',field=>'009'});
-is_ok ($m008 eq "960221s1955    dcuabcdjdbkoqu001 0deng d");	# 19
-is_bad (defined $m009);						# 20
+is_ok ($m008 eq "960221s1955    dcuabcdjdbkoqu001 0deng d");	
+is_bad (defined $m009);						
 
 if ($naptime) {
     print "++++ page break\n";
@@ -153,81 +153,81 @@ if ($naptime) {
 my ($m260a) = $x->getvalue({record=>'8',field=>'260',subfield=>'a'});
 my ($m260b) = $x->getvalue({record=>'8',field=>'260',subfield=>'b'});
 my ($m260c) = $x->getvalue({record=>'8',field=>'260',subfield=>'c'});
-is_ok ($m260a eq "Washington, DC :");				# 21
-is_ok ($m260b eq "Library of Congress,");			# 22
-is_ok ($m260c eq "1955.");					# 23
+is_ok ($m260a eq "Washington, DC :");				
+is_ok ($m260b eq "Library of Congress,");			
+is_ok ($m260c eq "1955.");					
 
 my @m260 = $x->getvalue({record=>'8',field=>'260'});
-is_ok ($m260[0] eq "Washington, DC : Library of Congress, 1955. ");	# 24
+is_ok ($m260[0] eq "Washington, DC : Library of Congress, 1955. ");	
 
 my ($m245i1) = $x->getvalue({record=>'8',field=>'245',subfield=>'i1'});
 my ($m245i2) = $x->getvalue({record=>'8',field=>'245',subfield=>'i2'});
 my ($m245i12) = $x->getvalue({record=>'8',field=>'245',subfield=>'i12'});
-is_ok ($m245i1 eq "1");						# 25
-is_ok ($m245i2 eq "2");						# 26
-is_ok ($m245i12 eq "12");					# 27
+is_ok ($m245i1 eq "1");						
+is_ok ($m245i2 eq "2");						
+is_ok ($m245i12 eq "12");					
 
-is_ok (3 == $x->selectmarc(["1","7-8"]));			# 28
-is_ok (3 == $x->marc_count);					# 29
+is_ok (3 == $x->selectmarc(["1","7-8"]));			
+is_ok (3 == $x->marc_count);					
 
 my @records=$x->searchmarc({field=>"020"});
-is_ok(2 == scalar @records);					# 30
-is_ok($records[0] == 2);					# 31
-is_ok($records[1] == 3);					# 32
+is_ok(2 == scalar @records);					
+is_ok($records[0] == 2);					
+is_ok($records[1] == 3);					
 
 @records=$x->searchmarc({field=>"020",subfield=>"c"});
-is_ok(1 == scalar @records);					# 33
-is_ok($records[0] == 3);					# 34
+is_ok(1 == scalar @records);					
+is_ok($records[0] == 3);					
 
 @records = $x->getupdate({field=>'020',record=>2});
-is_ok(7 == @records);						# 35
+is_ok(7 == @records);						
 
-is_ok($records[0] eq "i1");					# 36
-is_ok($records[1] eq " ");					# 37
-is_ok($records[2] eq "i2");					# 38
-is_ok($records[3] eq " ");					# 39
-is_ok($records[4] eq "a");					# 40
-is_ok($records[5] eq "8472236579");				# 41
-is_ok($records[6] eq "\036");					# 42
+is_ok($records[0] eq "i1");					
+is_ok($records[1] eq " ");					
+is_ok($records[2] eq "i2");					
+is_ok($records[3] eq " ");					
+is_ok($records[4] eq "a");					
+is_ok($records[5] eq "8472236579");				
+is_ok($records[6] eq "\036");					
 
 if ($naptime) {
     print "++++ page break\n";
     sleep $naptime;
 }
 
-is_ok(1 == $x->deletemarc({field=>'020',record=>2}));		# 43
+is_ok(1 == $x->deletemarc({field=>'020',record=>2}));		
 $records[6] = "c";
 $records[7] = "new data";
-is_ok($x->addfield({field=>'020',record=>2}, @records));	# 44
+is_ok($x->addfield({field=>'020',record=>2}, @records));	
 
 @records=$x->searchmarc({field=>"020",subfield=>"c"});
-is_ok(2 == scalar @records);					# 45
-is_ok($records[0] == 2);					# 46
-is_ok($records[1] == 3);					# 47
+is_ok(2 == scalar @records);					
+is_ok($records[0] == 2);					
+is_ok($records[1] == 3);					
 
 @records = $x->getvalue({record=>'2',field=>'020',delimiter=>'|'});
-is_ok(1 == scalar @records);					# 48
-is_ok($records[0] eq "|a8472236579|cnew data");			# 49
+is_ok(1 == scalar @records);					
+is_ok($records[0] eq "|a8472236579|cnew data");			
 
-is_ok(1 == $x->deletemarc({field=>'020',record=>2,subfield=>'c'}));	# 50
+is_ok(1 == $x->deletemarc({field=>'020',record=>2,subfield=>'c'}));	
 @records=$x->searchmarc({field=>"020",subfield=>"c"});
-is_ok(1 == scalar @records);					# 51
-is_ok($records[0] == 3);					# 52
+is_ok(1 == scalar @records);					
+is_ok($records[0] == 3);					
 
 @records = $x->getvalue({record=>'2',field=>'020',delimiter=>'|'});
-is_ok(1 == scalar @records);					# 53
-is_ok($records[0] eq "|a8472236579");				# 54
+is_ok(1 == scalar @records);					
+is_ok($records[0] eq "|a8472236579");				
 
-is_ok(3 == $x->deletemarc());					# 55
-is_zero($x->marc_count);					# 56
+is_ok(3 == $x->deletemarc());					
+is_zero($x->marc_count);					
 
 $MARC::TEST = 1;
 is_ok('0 but true' eq $x->openmarc({file=>$file4,
-				    'format'=>"marcmaker"}));	# 57
-is_ok(-2 == $x->nextmarc(4));					# 58
-is_ok(2 == $x->marc_count);					# 59
-is_ok($x->closemarc);						# 60
-is_ok(2 == $x->deletemarc());					# 61
+				    'format'=>"marcmaker"}));	
+is_ok(-2 == $x->nextmarc(4));					
+is_ok(2 == $x->marc_count);					
+is_ok($x->closemarc);						
+is_ok(2 == $x->deletemarc());					
 
 if ($naptime) {
     print "++++ page break\n";
@@ -235,7 +235,7 @@ if ($naptime) {
 }
 
 is_ok(2 == $x->openmarc({file=>$file4, increment=>2,
-			 'format'=>"marcmaker"}));		# 62
-is_bad(defined $x->nextmarc(1));				# 63
-is_ok(2 == $x->marc_count);					# 64
-is_ok($x->closemarc);						# 65
+			 'format'=>"marcmaker"}));		
+is_bad(defined $x->nextmarc(1));				
+is_ok(2 == $x->marc_count);					
+is_ok($x->closemarc);						

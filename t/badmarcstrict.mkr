@@ -1,0 +1,59 @@
+=LDR  00901cam\\2200241Ia\45e0
+=001  ocm01047729\
+=003  OCoLC
+=005  19960221075055.7
+=008  741021s1884\\\\enkaf\\\\\\\\\000\1\eng\d
+=040  \\$aKSU$cKSU$dGZM
+=090  \\$aPS1305$b.A1 1884
+=049  \\$aVODN
+=100  1\$aTwain, Mark,$d1835-1910.
+=245  14$aThe adventures of Huckleberry Finn :$b(Tom Sawyer's
+ comrade) : scene, the Mississippi Valley : time, forty to fifty
+ years ago /$cby Mark Twain (Samuel Clemens) ; with 174
+ illustrations.
+=260  \\$aLondon :$bChatto & Windus,$c1884.
+=300  \\$axvi, 438 p., [1] leaf of plates :$bill. ;$c20 cm.
+=500  \\$aFirst English ed.
+=500  \\$aState B; gatherings saddle-stitched with wire staples.
+=500  \\$aAdvertisements on p. [1]-32 at end.
+=500  \\$aBound in red S cloth; stamped in black and gold.
+=510  4\$aBAL$c3414.
+=740  01$aHuckleberry Finn.
+=994  \\$aE0$bVOD
+
+=LDR  01467cmm\\2200325Ka\45e0
+=001  ocm40139019\
+=003  OCoLC
+=005  19960221075055.7
+=007  cr\mnu
+=008  981020m19989999pau\\\\\\\\c\\\\\\\\eng\d
+=040  \\$aVOD$cVOD
+=090  \\$aTR820$b.A2
+=049  \\$aVODN
+=245  00$aAccuNet/AP photo archive$h[computer file]
+=246  30$aPhoto archive
+=246  3\$aAssociated Press photo archive
+=246  30$aAP photo archive
+=256  \\$aComputer image data.
+=260  \\$aState College, Pa. :$bAccuweather,$c1998-
+=538  \\$aMode of access: World Wide Web.
+=500  \\$aTitle from homepage.
+=500  \\$aPublished jointly by Accuweather and The Associated
+ Press.
+=506  \\$aSubscription based access.
+=520  \\$a"The Photo Archive features state, regional and national
+ photos from North America, as well as ... international photos
+ all available moments after they move on the AP's spot picture
+ system. An average of 800 photos a day feed into the Photo
+ Archive, and remain there for a minimum of one year. Specially
+ trained indexers select the best 200 or so photos each day to
+ save for all time, while the remainder are eliminated from the
+ Photo Archive after 12 months."
+=650  \0$aPhotojournalism$xComputer network resources.
+=650  \0$aPhotographs$xComputer network resources.
+=710  2\$aAssociated Press.
+=710  2\$aAccuweather.
+=856  7\$uhttp://ap.accuweather.com$2http$zConnect to this
+ resource.
+=994  \\$aE0$bVOD
+

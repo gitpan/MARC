@@ -137,7 +137,7 @@ may now create different output from the same source data.
 NOTES:
 
 Please let us know if you run into any difficulties using MARC.pm--
-e'd be happy to try to help. Also, please contact us if you notice any
+we'd be happy to try to help. Also, please contact us if you notice any
 bugs, or if you would like to suggest an improvement/enhancement. Email
 addresses are listed at the bottom of this page.
 
@@ -159,7 +159,7 @@ AUTHORS:
 
 COPYRIGHT
 
-Copyright (C) 1999, 2000 Bearden, Birthisel, Hochstenbach, Lane, McFadden, and 
-Summers.  All rights reserved. This module is free software; you can 
+Copyright (C) 1999, 2000 Bearden, Birthisel, Hochstenbach, Lane, McFadden, 
+and Summers.  All rights reserved. This module is free software; you can 
 redistribute it and/or modify it under the same terms as Perl itself.
 Portions Copyright (C) 1999, 2000 Duke University, Lane.

@@ -1,0 +1,8 @@
+# Make sure you have a shipdir first...
+shipdir=../ship/MARC
+pmfile=MARC.pm
+# You might want to have a ship file 
+# with a different name from dev file.
+shippm=MARC.pm
+# Clean out old .gz files with this prefix
+cleargz=MARC-

@@ -290,3 +290,33 @@ Revision history for Perl extension MARC.
 	of not throughout MARC.pm.
 
 
+1.11   Wed Aug  2 17:03:57 EDT 2000 <Lane>
+	- Fixed bug reported by Elisabeth Shaw on pack_008 (introduced
+	somewhere between 102u and 106).  Made sure that updatefirst 
+	was called with correct arguments.
+	- Added checks to updatefirst arguments. Pack_008 now updates
+	map. (Was the cause of regression tests falsely passed).
+	- t: test4 updatefirst changed to pass more stringent checking (xxx=>998).
+	- t: test1 and test3. Moved 005 tests to test original value of 005 (test2
+	tests correctly for update on output()).
+	- Changed last instance of croak() to mywarn(). 
+	- t: test5 changed updatefirst warning test. Made use of %SIG to promote
+	warning to die.
+	- All tests now pass.
+	- Added bin/ship.pl; now auto-packed versions can be made available.
+	- Added bin/chk.pl; cheapo tests without the ../blib overhead.
+	- Minor changes to docs.
+
+1.11   Wed Aug  28 03:02:00 EDT 2000 <Lane>
+	- Fixed newline issues on input (Ed Summers) and output.
+	- Allowed one to suppress header length error checking (strict=>0 on
+	  openmarc. (David Valentine; Ed's design).
+	- Added tests for relaxed error checking, more detailed tests for 
+	  nextmarc errors, non-default newlines on input and output for
+	  marcmaker records.
+	- Updated and expanded docs.
+	  Added docs on template use for the getfields/updatefields/*first functions.
+	  Fixed some speling erorrs.
+	- Removed test numbers from the test*t's. Diffs will be clearer in the future.
+	  Use b is_ok $tc=nn in the debugger instead.
+	

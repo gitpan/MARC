@@ -10,11 +10,20 @@ t/test3.t
 t/test4.t
 t/test5.t
 t/badmarc.dat
+t/badmarcstrict.mkr
+t/badstrictcmp.mkr
+t/badmarc.mkr
+t/badmarcnl.mkr
+t/badcmpnl.mkr
+t/badcmp.mkr
+t/makrtestnl.src
+t/makrbrkr.out
 t/marc.dat
 t/marc4.dat
 t/MARCopt.pm
 t/makrbrkr.mrc
 t/makrtest.src
+t/makrtestnl.src
 t/makrtest.bad
 t/brkrtest.ref
 eg/uclocal.pl
@@ -22,3 +31,6 @@ eg/addlocal.pl
 eg/fixlocal.pl
 eg/microlif.001
 eg/specials.001
+bin/ship.pl
+bin/chk.pl
+SHIP

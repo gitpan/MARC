@@ -4,7 +4,7 @@ use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST);
 
-$VERSION = '1.10';
+$VERSION = '1.12';
 $MARC::DEBUG = 0;
 $MARC::TEST = 0;
 
@@ -39,9 +39,10 @@ sub new { # rec
     my $file = shift;
     my $marc = []; 
     my $totalrecord;
-    $marc->[0]{'increment'}=-1; #store the default increment in the object
+    $marc->[0]{'strict'} = 1;     # default to checking lengths on import. 
+    $marc->[0]{'increment'} = -1; # store the default increment in the object
     my $proto_rec;
-#    print STDERR "foo\n";
+
     { 
 	# We are going to look for related classes in Perl's
 	# symbol table. This is a little tricky.
@@ -73,7 +74,9 @@ sub new { # rec
 	open(*file, $file) or mycarp "Open Error: $file, $!";
 	binmode *file;
 	$marc->[0]{'handle'}=\*file;
-	$proto_rec->{'handle'} = $marc->[0]{'handle'};
+	for (qw/handle lineterm/) {
+	    $proto_rec->{$_} = $marc->[0]{$_};
+	}
 	$proto_rec->{'format'} = lc $format;
         if ($format =~ /usmarc$/io) {
 	    $marc->[0]{'format'}='usmarc';
@@ -210,6 +213,9 @@ sub openmarc {
     my $file=$params->{'file'};
     if (not(-e $file)) {mycarp "File \"$file\" doesn't exist"; return} 
     $marc->[0]{'format'}=$params->{'format'}; #store format in object
+    if (exists $params->{'strict'}) {
+	$marc->[0]{'strict'}=$params->{'strict'} ; 
+    }
     my $totalrecord;
     $marc->[0]{'increment'}=$params->{'increment'} || 0;
         #store increment in the object, default is 0
@@ -218,8 +224,11 @@ sub openmarc {
     binmode *file;
     $marc->[0]{'handle'}=\*file; #store filehandle in object
     my $proto_rec = $marc->[0]{'proto_rec'};
+
     $proto_rec->{'handle'} = $marc->[0]{'handle'};
     $proto_rec->{'format'} = lc $marc->[0]{'format'};
+    $proto_rec->{'strict'} = $marc->[0]{'strict'};
+
     if ($marc->[0]{'format'} =~ /usmarc/oi) {
 	$totalrecord = _readmarc($marc);
     }
@@ -233,6 +242,7 @@ sub openmarc {
 	    }
         }
         $marc->[0]{'lineterm'} = $params->{'lineterm'} || "\015\012";
+	$proto_rec->{'lineterm'} = $marc->[0]{'lineterm'};
 	$totalrecord = _readmarcmaker($marc);
     }
     else {
@@ -515,11 +525,12 @@ sub getfirstvalue { # rec
     my $marc= shift;
     my $template=shift;
     return unless (ref($template) eq "HASH");
-    my $record = $template->{record};
+    my $params = _params($template,@_);
+    my $record = $params->{record};
     if (not($record)) {mycarp "You must specify a record"; return}
     if ($record > $#{$marc}) {mycarp "Invalid record specified"; return}
     my $marcrec = $marc->[$record];
-    return $marcrec->getfirstvalue($template);
+    return $marcrec->getfirstvalue($params);
 
 }
 
@@ -1366,7 +1377,7 @@ sub new { # rec
     my $marcrec = {}; 
     bless ($marcrec, $class);
     my $format = shift || "usmarc";
-
+    $marcrec->{'strict'} = 1;
     $marcrec->{'handle'} ||= \*filehandle;
     $marcrec->{'format'}=$format;
     $marcrec->{'lineterm'}="\015\012" if $format eq 'marcmaker';
@@ -1490,14 +1501,16 @@ sub deletefirst { # rec
     my $template = shift;
     return unless (ref($template) eq "HASH");
     return if (defined $template->{'value'});
-
+    if ($template->{'i1'} or $template->{'i2'} ) {
+	mycarp "Cannot delete indicators"; return undef;
+    }
     my $field = $template->{'field'};
 
     my $subfield = $template->{'subfield'};
     my $do_rebuild_map = $template->{'rebuild_map'};
     if (defined($subfield) and $subfield =~/^i[12]$/) {mycarp "Cannot delete indicators"; return undef}
 #I know that $marc->{$field}{field} is this information
-#But I don't want to depend on the map being up-to-date allways.
+#But I don't want to depend on the map being up-to-date always.
 
     my @fieldrefs = $marcrec->getfields($template); #helps with cjk.
 
@@ -1708,7 +1721,7 @@ sub _marcmaker { # rec
 	    push @output2, $outline2;
 	}
     }
-    my $breaker = join ($newline, @output2);
+    my $breaker = join ($newline, @output2).$newline;
     return $breaker;
 }
 
@@ -2043,9 +2056,9 @@ sub _readmarc { # rec
     if ($recordlength =~ /\d{5}/o) {
 	print "recordlength = $recordlength, length = $octets\n"
 		if $MARC::DEBUG;
-	return  (undef,-1) unless $recordlength == $octets;
+	return  (undef,-1) if $recordlength != $octets &&  $marcrec->{'strict'};
     } else {
-	return  (undef,-2);
+	return  (undef,-2) if  $marcrec->{'strict'};
     }
     my @d = ();
     $line=~/^(.{24})([^\036]*)\036(.*)/o;
@@ -2279,6 +2292,10 @@ sub updatefirst { # rec
 
 
     my @ufield = @_;
+    if ($ufield[0] !~/\d\d\d/) {
+	mycarp "You need to pass a complete field spec,even if we do not use the tag"
+    }
+
     my $field = $template->{'field'};
     my $subfield = $template->{'subfield'};
     my $do_rebuild_map = $template->{'rebuild_map'};
@@ -2306,7 +2323,7 @@ sub updatefirst { # rec
 	$rafieldrefs->[0] = \@ufield;
 	if (!scalar(@fieldrefs)) {
 	    $marcrec->updatefields($template,$rafieldrefs);		
-	    return;
+	    return 0;
 	}
 	$fieldrefs[0]=\@ufield;
 #There is no issue with $fieldrefs being taken over by the splice in updatefields.
@@ -2318,7 +2335,7 @@ sub updatefirst { # rec
 # indicators since every non-control field has them.)
 # OK, we have  field, and subfield. 
 	if ($field and $subfield) {
-	    if ($field <10) {croak "Cannot update subfields of control fields"; return undef}
+	    if ($field <10) {mycarp "Cannot update subfields of control fields"; return undef}
 
 	    my $rvictim=0;
 	    my $fieldnum = 0;
@@ -2514,7 +2531,7 @@ sub add_005 {
     my $marcrec=shift;
     my $time = shift;
     my @m005 = ('005', $time );
-    $marcrec->updatefirst({field=>'005'},@m005);
+    $marcrec->updatefirst({field=>'005',rebuild_map=>1},@m005);
 }
 
 ##############################################################
@@ -2640,6 +2657,7 @@ sub getfirstvalue { # rec
 	return undef unless $rsubf;
     }
 }
+
 ####################################################################
 # getvalue() will return the value of a field or subfield in a     #
 # particular record found in the MARC object                       #
@@ -2860,7 +2878,7 @@ sub pack_008 { # rec
     my $rhff = $marcrec->get_hash_008();
     return undef unless $rhff;
     my $ff_string = $marcrec->_pack_008($ldr,$rhff);
-    $marcrec->updatefirst({field=>'008'},$ff_string);
+    $marcrec->updatefirst({field=>'008',rebuild_map=>1},'008',$ff_string);
     return $ff_string;
 }
 
@@ -3184,23 +3202,34 @@ must not be used with B<updaterecord()>.
 
 =over 4
 
-deletemarc() - field (all), record (all), subfield [supplemental]
+deletemarc()    - field (all), record (all), subfield [supplemental]
 
-searchmarc() - B<field>, regex, notregex, subfield [supplemental]
+searchmarc()    - B<field>, regex, notregex, subfield [supplemental]
 
-getvalue() - B<record>, B<field>, subfield, delimiter [supplemental]
+getvalue()      - B<record>, B<field>, subfield, delimiter [supplemental]
 
-getupdate() - B<record>, B<field>
+getfirstvalue() - B<record>, B<field>, subfield, delimiter [supplemental]
 
-addfield() - B<record>, B<field>, i1 (' '), i2 (' '), value, ordered ('y')
+getupdate()     - B<record>, B<field>
 
-updaterecord() - B<record>, B<field>, i1 (' '), i2 (' '), ordered ('y')
+getfields()     - B<record>, B<field> 
+
+addfield()      - B<record>, B<field>, i1 (' '), i2 (' '), value, ordered ('y')
+
+updaterecord()  - B<record>, B<field>, i1 (' '), i2 (' '), ordered ('y')
+
+updatefields()  - B<record>, B<field> 
+
+deletefirst()   - B<record>, B<field>, subfield
+
+updatefirst()   - B<record>, B<field>, subfield, i1,i2
 
 =back
 
-The methods that accept a I<subfield> option also accept specifying it as a
-supplemental parameter. Supplemental parameters append/overwrite the hash
-values specified in the template.
+Methods that accept a I<subfield> option also accept specifying it as
+a supplemental parameter. (Deletefirst and updatefirst are the only
+exceptions).  Supplemental parameters append/overwrite the hash values
+specified in the template.
 
     $x->deletemarc($loc852, 'subfield','k');
 
@@ -3210,6 +3239,7 @@ values specified in the template.
         $value = $x->getvalue($f260,'record',"$found",'field',"245");
         print "TITLE: $value\n";
     }
+
 
 =head1 METHODS
 
@@ -3265,6 +3295,13 @@ want to modify a couple of characters. See example below.
     $x->openmarc({file=>"makrbrkr.mrc",'format'=>"marcmaker",
 		  increment=>"5",lineterm=>"\n",
 		  charset=>\%char_hash});
+
+openmarc inherits some error checking sanity checks from MARC::Rec::nextrec. 
+These will lead it to return the negative of the number of records read in if
+there is a header length error. This behavior can be suppressed with an option:
+
+    $x->openmarc({file=>"mymarc.dat", format=>"usmarc",
+		  increment=> 1, strict => 0});
 
 =head2 nextmarc()
 
@@ -3366,7 +3403,7 @@ effect as add_map.
 
 =head2 rebuild_map
 
-rebuild_map takes a recnum and a tag and will synchronise the index with
+rebuild_map takes a recnum and a tag and will synchronize the index with
 the array elements of the marc record at the recnum with that tag.
 
       #Gonna change all 099's to 092's since this is a music collection.
@@ -3383,7 +3420,7 @@ as rebuild_map.
 
 =head2 rebuild_map_all
 
-rebuild_map takes a recnum and will synchronise the index with
+rebuild_map takes a recnum and will synchronize the index with
 the array elements of the marc record at the recnum.
 
 MARC::Rec::rebuild_map_all() does not need the record number and has the same effect
@@ -3418,7 +3455,7 @@ getfirstvalue will return the first value of a field or subfield or
 indicator or i12 in a particular record found in the MARC object. It
 does not depend on the index being up to date.
 
-MARC::Rec::getfirstvalue is identical to getfields, but ignores any record
+MARC::Rec::getfirstvalue is identical to getfirstvalue, but ignores any record
 specification in the template.
 
 =head2 getvalue()
@@ -3533,12 +3570,12 @@ MARC::Rec::get_hash_008() is identical to get_hash_008, but does not need the re
 =head2 pack_008($record)
 
 Takes a record number and updates the appropriate 008. Will force update of the
-ldr based on any existing hash version.
+ldr based on any existing hash version. Updates the map for 008.
 
       foreach $record (1..$#$x) {
 	    my $rff = $x->unpack_008($record);
 	    $rff->{'Date1'}='2000';
-	    print "Record:$record Y2K problem created";
+	    print "Record:$record Y2K problem created\n";
 	    $x->pack_008($record);
 	    # New value is in the 008 field of $record'th marc
       }
@@ -3548,20 +3585,74 @@ MARC::Rec::pack_008() is identical to pack_008, but does not need the record num
 =head2 deletefirst()
 
 deletefirst() takes a template. It deletes the field data for a first
-match, using the template and leaves the rest alone. If the template
-has a subfield element it deletes based on the subfield information in
-the template. If the last subfield of a field is deleted,
-deletefirst() also deletes the field.  It complains about attempts to
-delete indicators.  If there is no match, it does nothing. Deletefirst
-also rebuilds the map if the template asks for that
+match, using the template and leaves the rest alone. 
+
+For example, assume that we have a marc file whose second record
+looks like:
+
+    =008  960221s1955\\\\dcuabcdjdbkoqu001\0dspa\d
+    =020  \\$a0777000008 :$c{24}35.99
+    =020  \\$a0777000008 :$c{curren}35.99
+    =040  \\$aViArRB$cViArRB
+    =100  2 $aDeer-Doe, Jane,$d1957-
+
+Assume we have placed this in a MARC object x. Then we can delete 
+an entire field of the second record thus:
+
+    my $loc100 = {record=>2,field=>100,rebuild_map=>1};
+    $x->deletefirst($loc100);
+
+The second record now looks like:
+
+    =008  960221s1955\\\\dcuabcdjdbkoqu001\0dspa\d
+    =020  \\$a0777000008 :$c{24}35.99
+    =020  \\$a0777000008 :$c{curren}35.99
+    =040  \\$aViArRB$cViArRB
+
+If the template has a subfield element it deletes based on the
+subfield information in the template.
+
+    $x->deletefirst({record=>2,field=>020,subfield=>'c',rebuild_map=>1};
+
+    =008  960221s1955\\\\dcuabcdjdbkoqu001\0dspa\d
+    =020  \\$a0777000008 :
+    =020  \\$a0777000008 :$c{curren}35.99
+    =040  \\$aViArRB$cViArRB
+
+ If the last subfield of a field is deleted,
+deletefirst() also deletes the field.
+
+    $x->deletefirst({record=>2,field=>020,subfield=>'a',rebuild_map=>1};
+
+    =008  960221s1955\\\\dcuabcdjdbkoqu001\0dspa\d
+    =020  \\$a0777000008 :$c{curren}35.99
+    =040  \\$aViArRB$cViArRB
+
+  It complains about attempts to
+delete indicators. 
+
+    $x->deletefirst({record=>2,field=>020,subfield=>'i1',rebuild_map=>1};
+    OR
+    $x->deletefirst({record=>2,field=>020,i1=>1,rebuild_map=>1};
+
+Produces a warning and leaves the record untouched.
+
+ If there is no match, it does nothing.
+
+    $x->deletefirst({record=>2,field=>020,subfield=>'x',rebuild_map=>1};
+
+    =008  960221s1955\\\\dcuabcdjdbkoqu001\0dspa\d
+    =020  \\$a0777000008 :$c{curren}35.99
+    =040  \\$aViArRB$cViArRB
+
+ Deletefirst also rebuilds the map if the template asks for that
 $do_rebuild_map. Deletefirst returns the number of matches deleted
 (that would be 0 or 1), or undef if it feels grumpy (i.e. carps).
 
 MARC::Rec::deletefirst($template) is identical to deletefirst, but ignores any record number
 specified by $template.
 
-Most use of deletefirst is expected to be by MARC::Tie.
-
+Most use of deletefirst is expected to be by Tie::MARC.
 
 =head2 deletemarc()
 
@@ -3596,7 +3687,7 @@ field needs to be created, in which case they are left blank.
 MARC::Rec::updatefirst($template) is identical to deletefirst, but ignores any record number
 specified by $template.
 
-Most use of updatefirst() is expected to be from MARC::Tie.
+Most use of updatefirst() is expected to be from Tie::MARC.
 It does not currently provide a useful return value.
 
 =head2 updatefields()
@@ -3626,7 +3717,7 @@ Returns 0 or a ref to the value to be updated.
     my $rval = getmatch('i2',$rvictim);
     $$rval = "4" if $rval;
 
-MARC::Rec::getmatch($subf,$rfield) is identical to getmatch;
+MARC::Rec::getmatch($subf,$rfield) is identical to getmatch.
 
 =head2 insertpos()
 
@@ -3704,7 +3795,7 @@ MARC::Rec::createrecord($leader) returns an instance of a suitable subclass of M
 
 =head2 getupdate()
 
-The B<getupdate()> method returns an array that contains the contents of a fieldin a defined order that permits restoring the field after deleting it. This permits changing only individual subfields while keeping other data intact. If a field is repeated in the record, the resulting array separates the field infomation with an element containing "\036" - the internal field separator which can never occur in real MARC data parameters. A non-existing field returns C<undef>. An example will make the structure clearer. The next two MARC fields (shown in ASCII) will be described in the following array:
+The B<getupdate()> method returns an array that contains the contents of a field in a defined order that permits restoring the field after deleting it. This permits changing only individual subfields while keeping other data intact. If a field is repeated in the record, the resulting array separates the field information with an element containing "\036" - the internal field separator which can never occur in real MARC data parameters. A non-existing field returns C<undef>. An example will make the structure clearer. The next two MARC fields (shown in ASCII) will be described in the following array:
 
 		246  30  $aPhoto archive
 		246  3   $aAssociated Press photo archive
@@ -3730,7 +3821,7 @@ After making any desired modifications to the data, the existing field can be re
 
 =head2 updaterecord()
 
-The updaterecord() method is a more complete version of the preceeding sequence with error checking and the ability to split the update array into multiple addfield() commands when given repeating fields. It takes an array of key/value pairs, formatted like the output of getupdate(), and replaces/creates the field data. For repeated tags, a "\036" element is used to delimit data into separate addfield() commands. It returns the number of successful addfield() commands or C<undef> on failure.
+The updaterecord() method is a more complete version of the preceding sequence with error checking and the ability to split the update array into multiple addfield() commands when given repeating fields. It takes an array of key/value pairs, formatted like the output of getupdate(), and replaces/creates the field data. For repeated tags, a "\036" element is used to delimit data into separate addfield() commands. It returns the number of successful addfield() commands or C<undef> on failure.
 
     $repeats = $x->updaterecord($update246, @u246);	# same as above
 
@@ -3748,7 +3839,7 @@ This method will allow you to addfields to a specified record. The syntax may lo
                  [a=>"The adventures of Huckleberry Finn /",
                   c=>"Mark Twain ; illustrated by E.W. Kemble."]});
 
-This example intitalized a new record, and added a 100 field and a 245 field. For some more creative uses of the addfield() function take a look at the I<EXAMPLES> section. The I<value> parameters, including I<i1> and I<i2>, can be specified using a separate array. This permits restoring field(s) from the array returned by the B<getupdate()> method - either as-is or with modifications. The I<i1> and I<i2> key/value pairs must be first and in that order if included.
+This example initialized a new record, and added a 100 field and a 245 field. For some more creative uses of the addfield() function take a look at the I<EXAMPLES> section. The I<value> parameters, including I<i1> and I<i2>, can be specified using a separate array. This permits restoring field(s) from the array returned by the B<getupdate()> method - either as-is or with modifications. The I<i1> and I<i2> key/value pairs must be first and in that order if included.
 
 	# same as "100" example above
     my @v100 = 'i1','1','i2',"0",'a',"Twain, Mark, ",
@@ -3762,7 +3853,7 @@ updates the indicated records with updated 005 fields (date of last transaction)
 
 =head2 output()
 
-Output is a multifunctional method for creating formatted output from a MARC object. There are three parameters I<file>, I<format>, I<records>. If I<file> is specified the output will be directed to that file. It is important to specify with E<gt> and E<gt>E<gt> whether you want to create or append the file! If no I<file> is specified then the results of the output will be returned to a variable (both variations are listed below). 
+Output is a multi-functional method for creating formatted output from a MARC object. There are three parameters I<file>, I<format>, I<records>. If I<file> is specified the output will be directed to that file. It is important to specify with E<gt> and E<gt>E<gt> whether you want to create or append the file! If no I<file> is specified then the results of the output will be returned to a variable (both variations are listed below). 
 
 The MARC standard includes a control field (005) that records the date of last automatic processing. This is implemented as a side-effect of output() to a file or if explicitly requested via a add_005s field of the template. The current time is stamped on the records indicated by the template.
 
@@ -3868,7 +3959,7 @@ An experimental output format that attempts to mimic the ISBD.
 
 XML
 
-Roundtrip conversion between MARC and XML is handled by the subclass 
+Round-trip conversion between MARC and XML is handled by the subclass 
 MARC::XML. MARC::XML is available for download from the CPAN.
 
 
@@ -3907,7 +3998,7 @@ MARC::Rec::ustext_default is identical to ustext_default;
 
 =head2 as_string()
 
-As_string() takes no paramaters and returns a (Unix) newline separated version of the record.
+As_string() takes no parameters and returns a (Unix) newline separated version of the record.
 
   Format is: $tag<SPACE>$i1$i2<SPACE>$subfields
   where $subfields are separated by "\c_" binary subfield indicators.
@@ -3918,7 +4009,7 @@ they should override from_string.
 
 =head2 from_string()
 
-From_string() takes a string paramater and updates the calling record's {array} information.
+From_string() takes a string parameter and updates the calling record's {array} information.
 It assumes the string is formatted like the output of as_string(). 
 
 =head1 EXAMPLES
@@ -3991,31 +4082,31 @@ Perhaps you have a tab delimited text file of data for online journals you have 
 Perhaps you have periodicals coming in that you want to order by 
 location and then title. MARC::Rec's get you out of some array indexing.
 
-#!/usr/bin//perl
-use MARC 1.03;
+    #!/usr/bin//perl
+    use MARC 1.03;
 
-my @newmarcs=@$marc[1..$#$marc]; # array slice.
-my @sortmarcs = sort by_loc_oclc @newmarcs;
-@marc[1..$#$marc] = @sortmarcs;
+    my @newmarcs=@$marc[1..$#$marc]; # array slice.
+    my @sortmarcs = sort by_loc_oclc @newmarcs;
+    @marc[1..$#$marc] = @sortmarcs;
 
-sub by_loc_title {
-    my ($aloc,$atitle) = loc_title($a);
-    my ($bloc,$btitle) = loc_title($b);
-    return  $aloc cmp $bloc 
-	          ||
-	  $atitle cmp $btitle;
-}
+    sub by_loc_title {
+	my ($aloc,$atitle) = loc_title($a);
+	my ($bloc,$btitle) = loc_title($b);
+	return  $aloc cmp $bloc 
+		      ||
+	      $atitle cmp $btitle;
+    }
 
-sub loc_title {
-    my ($rec)=@_;
-    my $n049 = $rec->getfirstvalue({field=>040});
-    my ($loc) = $n049=~/(ND\S+)/; # Or the first two letters of your OCLC
-                                  # location.
+    sub loc_title {
+	my ($rec)=@_;
+	my $n049 = $rec->getfirstvalue({field=>040});
+	my ($loc) = $n049=~/(ND\S+)/; # Or the first two letters of your OCLC
+				      # location.
 
-    my $title = $rec->getfirstvalue({field=>100,delimiter=>" "});
+	my $title = $rec->getfirstvalue({field=>100,delimiter=>" "});
 
-    return ($loc,$title);
-}
+	return ($loc,$title);
+    }
 
 =back
 
