@@ -4,7 +4,7 @@ use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST);
 
-$VERSION = '1.13';
+$VERSION = '1.14';
 $MARC::DEBUG = 0;
 $MARC::TEST = 0;
 
@@ -1992,7 +1992,7 @@ sub add_map { # rec
     my @tmp = @$rafield;
     my $field_len = $#tmp;
     my $record = $marcrec;
-    if ($tag > 10 ) {
+    if ($tag >= 10 ) {
 	my $i1 = $rafield->[1];
 	my $i2 = $rafield->[2];
 	my $i12 = $i1.$i2;
