@@ -21,12 +21,14 @@
 # librarian can update those manually. Finally, we will insert the call
 # number as a 900 tag.
 
-    use MARC 0.91;
+    # use lib '..';
+    use MARC 0.92;
     my $infile = "microlif.001";
-    my $outfile = "microlif.002";
-    my $outfile2 = "microlif.txt";
-    my $outtext = "missing.txt";
-    unlink $outfile, $outtext, $outfile2;
+    my $outfile = "output.002";
+    my $outfile2 = "output2.txt";
+    my $outfile3 = "output.mkr";
+    my $outtext = "output.txt";
+    unlink $outfile, $outtext, $outfile2, $outfile3;
     
     $x = MARC->new;
     $x->openmarc({file=>$infile,'format'=>"usmarc"}) || die;
@@ -36,13 +38,13 @@
 # But a few percent of incoming materials do not include this subfield.
 
     while ($x->nextmarc(1)) {
-        my @callno = $x->getvalue({record=>'1',field=>'852',subfield=>'h'});
-	@callno = ("") unless (defined @callno);
+        my ($callno) = $x->getvalue({record=>'1',field=>'852',subfield=>'h'});
+	$callno = "" unless (defined $callno);
         $x->addfield({record=>1, 
                       field=>"999", 
                       ordered=>"n", 
                       i1=>" ", i2=>" ", 
-                      value=>[c=>"wL70",d=>"AR Clinton PL",f=>"$callno[0]"]});
+                      value=>[c=>"wL70",d=>"AR Clinton PL",f=>"$callno"]});
 
 # Tag 999 subfield 'f' gets the Call Number. The others are constant in this
 # example. Tag 999 is the last legal choice, so a simple append is fine.
@@ -51,14 +53,15 @@
                       field=>"900", 
                       ordered=>"y", 
                       i1=>" ", i2=>" ", 
-                      value=>[a=>"$callno[0]"]});
+                      value=>[a=>"$callno"]});
 
 # Tag 900 subfield 'a' gets the Call Number. Since some records already
 # have 9xx tags (e.g. 935), we want 'ordered' (which is also the default).
 
         $x->output({file=>">>$outfile",'format'=>"usmarc"});
-        $x->output({file=>">>$outtext",'format'=>"ascii"}) unless $callno[0];
+        $x->output({file=>">>$outtext",'format'=>"ascii"}) unless $callno;
         $x->output({file=>">>$outfile2",'format'=>"ascii"});
+        $x->output({file=>">>$outfile3",'format'=>"marcmaker"});
         $x->deletemarc(); #empty the object for reading in another
     }
 

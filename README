@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=0.91, 19 October 1999
+VERSION=0.96, 03 November 1999
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -34,11 +34,20 @@ FILES:
 
     t			- test directory
     t/marc.dat		- two record data file for testing
-    t/test1.t		- RUN ME FIRST, basic tests
+    t/test1.t		- basic tests, search, update
+    t/test2.t		- MARCMaker format tests
+    t/test3.t		- Inheritance version of test1.t
+    t/MARCopt.pm	- Inheritance stub module
+    t/makrbrkr.mrc	- LoC. MARCMaker reference records
+    t/makrtest.src	- MARCMaker source for makrbrkr.mrc
+    t/brkrtest.ref	- MARCBreaker output from makrbrkr.mrc
 
     eg			- test directory
     eg/microlif.001	- eighteen record data file for demo
     eg/addlocal.pl	- simple modify/write demo with comments
+    eg/specials.001	- complex data file for fixlocal demo
+    eg/fixlocal.pl	- multi-field search and replace demo with comments
+			  and option templates
 
 INSTALL and TEST:
 
@@ -71,6 +80,42 @@ No response that means everything is OK! If you get an error like
 able to find MARC.pm--double check that the file copied it into the
 right place during the install.
 
+EXPERIMENTAL ELEMENTS:
+
+A number of functions were added in Version 0.92 by Derek Lane to
+support updating "000" and "008" fields. All of these are experimental
+and ay be subject to changes or syntax refinements. Here are his
+comments:
+
+	(unpack_ldr): gets an updateable version of the LDR
+	
+	(_unpack_ldr): This and other _ - series functions work fine on a
+	record-by-record basis. In general all official methods in the
+	(un)?pack.* series call corresponding _(un)?pack.* methods. The
+	official interfaces have to specify the records.
+	
+	(_pack_ldr): Added in 0.95d
+	
+	(bib_format): returns, e.g. BOOK or SERIAL. Don't confuse this
+	with usmarc vs XML.
+	
+	(_bib_format): Suitable for record-by-record access.
+
+	(unpack_008): Returns updateable fixed field information.
+
+	(_unpack_008): Internal record-by-record equivalent.
+
+	(_pack_008): Added in 0.95d
+
+COMPATIBILITY:
+
+The length() method has been deprecated because it overrides a Perl builtin.
+Use the new marc_count() method instead.
+
+Version 0.93 adds character_set conversions to MarcMaker format reads and
+writes. The usmarc/ustext character maps are used by default, so existing
+files in that format will produce different results than earlier versions.
+
 NOTES:
 
 Please let us know if you run into any difficulties using MARC.pm--
@@ -91,11 +136,11 @@ AUTHORS:
     Bill Birthisel wcbirthisel@alum.mit.edu
     Charles McFadden chuck@vims.edu
     Ed Summers esummers@odu.edu
+    Derek Lane dereklane@pobox.com
 
 COPYRIGHT
-    Copyright (C) 1999, Bearden, Birthisel, McFadden, Summers. All
-    rights reserved.
 
-    This module is free software; you can redistribute it and/or
-    modify it under the same terms as Perl itself.
-
+Copyright (C) 1999, Bearden, Birthisel, Lane, McFadden, and Summers.
+All rights reserved. This module is free software; you can redistribute
+it and/or modify it under the same terms as Perl itself.
+Portions Copyright (C) 1999, Duke University, Lane.

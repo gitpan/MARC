@@ -90,3 +90,76 @@ Revision history for Perl extension MARC.
 	- filter '\r' and '\cZ' from binary input stream
 	- fix "delete all records" bug
 
+0.911 Wed Oct 20 21:49:02 CDT 1999 <Birthisel>
+	- add "exists" tests to getvalue()
+	- use scalar $callno in addlocal.pl
+
+0.92  Sat Oct 23 00:00:00 CDT 1999 <Lane>
+	- initialize loop counter in getvalue() to avoid warnings
+	- add methods for manipulating "000" and "008" fields:
+		unpack_ldr,	bib_format,	unpack_008
+	- add internal subroutines supporting those methods:
+		_unpack_ldr,	_bib_format,	_unpack_008,
+	- add internal update subroutines:
+		_pack_ldr,	_pack_008
+	
+0.93  Wed Oct 27 21:30:17 CDT 1999 <Birthisel>
+	- deprecate length(), use marc_count() instead
+	- new: bless earlier so _readxxx can use methods
+	- add error checks to file open/close, use binmode
+	- add lineterm for _readmarcmaker and default to DOS
+	- always store header in $record->{'000'} tag position
+	- fix bugs in 'i12' subfield structure
+	- add usmarc_default, ustext_default, MARCMaker charset encode/decode
+	- use createrecord, addfield in _readmarcmaker
+	- fix fieldnotvalue in searchmarc
+	- extensive changes to getvalue to cover '000' tag and indicators
+	- use getvalue in unpack_008
+	- return undef instead of die in _unpack_008
+	- allow lineterm option in output, 'format' defaults to 'marc',
+	  lineterm to '\n' except MARCMaker (CRLF)
+	- add nolinebreak option for MARCBreaker output
+	- 'html_header' outputs "Content-type...", 'html_start' does "<body>"
+	- _writemarc also updates '000' size data in structure
+	- warnings off in addfield
+	- update copyright
+	- add test2.t and test3.t plus supporting files: makrbrkr.mrc,
+	  brkrtest.ref, makrtest.src
+	- add filestring and out_cmp test utilities, MARCopt.pm stub
+	- add MARCMaker/Breaker, getvalue, and searchmarc tests
+
+0.94  Thu Oct 28 20:23:57 CDT 1999 <Birthisel>
+	- added numerous "exists" tests for hash queries
+	- add 'title' parameter to html_start
+	- extra error checking: addfield
+	- new getupdate() method
+	- add tests for searchmarc, deletemarc, addfield, getupdate,
+	  html_xxx formats
+	- fix test3.t to use MARCopt everywhere
+
+0.95  Tue Nov 02 20:49:09 CST 1999 <Birthisel>
+	- clean up the Win32 "make clean" implementation in Makefile.PL
+	- add tests for selectmarc
+	- add 'title' option for URLs output
+	- terminate addfield if $subfield_id eq "\036" from getupdate()
+	- pod updates: SYNOPSIS, Option Template, various typos
+	- add updaterecord()
+	- template extensions for deletemarc(), searchmarc(), getvalue()
+	- add eg/fixlocal.pl demo and eq/specials.001
+
+0.95d  Wed Nov 03 17:00:01 EST 1999 <Lane>
+	- Removed FF_ prefix from @LDR_FIELDS. Left package globals for
+          fixed fields and leaders as globals: this should facilitate
+	  anybody who wants to subclass for MFHL, community, records.
+	- Added pack_008 and pack_ldr. Added get_hash_008 and
+	  get_hash_ldr for future tied interface. Fixed bugs. 
+	  (FF_ prefixes in hash keys.)
+	- Added and updated docs for the new functions.
+	- Added comment on how to renumber tests.
+	- Added tests of pack_008 and pack_ldr. Fixed some test bugs
+	  with FF_ prefixes and non-existent functions.
+
+0.96   Wed Nov  3 23:04:31 CST 1999 <Birthisel>
+	- fix typos in pod2man and pod2html output
+	- fix test3.t like test1.t
+

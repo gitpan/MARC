@@ -5,6 +5,14 @@ Makefile.PL
 README
 README.txt
 t/test1.t
+t/test2.t
+t/test3.t
 t/marc.dat
+t/MARCopt.pm
+t/makrbrkr.mrc
+t/makrtest.src
+t/brkrtest.ref
 eg/addlocal.pl
+eg/fixlocal.pl
 eg/microlif.001
+eg/specials.001

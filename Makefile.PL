@@ -9,7 +9,7 @@ unless ($^O eq "MSWin32") {
         'NAME'	=> 'MARC',
         'VERSION_FROM' => 'MARC.pm', # finds $VERSION
         'SKIP'	=> [qw(tool_autosplit)],
-        'clean'	=> {FILES => "t/output*.* output*.* eg/*.txt eg/*.002"},
+        'clean'	=> {FILES => "*/output* output*"},
     );
     exit;
 }
@@ -19,6 +19,15 @@ unless ($^O eq "MSWin32") {
 use File::Copy;
 use File::Path;
 use Pod::Html;
+use File::Find;
+
+    # clean up test and example result files
+find(\&wanted, ".");
+
+sub wanted {
+    return unless (/^output/);
+    unlink ($_);
+}
 
 my $version = simple_version("MARC.pm");
 my $INST_LIBDIR = "./lib";
@@ -26,14 +35,6 @@ my $INST_HTMLDIR = "./html";
 my $INST_FILES = "MARC.pm";
 my $INST_NAME = "MARC";
 my @HTML_FILES = "MARC";
-
-    # probably should auto-generate @cleanfiles
-my @cleanfiles = qw( output.txt output.html output.xml output.urls output2.html
-		     t/output.txt t/output.html t/output.xml t/output.urls
-		     t/output2.html output.isbd t/output.isbd output.mkr
-		     t/output.mkr eg/microlif.002 eg/microlif.txt
-		     eq/missing.txt
-		  );
 
 print <<INTRO3;
                            MARC version $version
@@ -45,7 +46,7 @@ print <<INTRO3;
 INTRO3
 
 my $dfile = "test.pl";
-unlink $dfile, @cleanfiles;
+unlink $dfile;
 print "Creating new $dfile\n";
 open (DEFAULT, "> $dfile") or die "Can't create $dfile: $!\n";
 
@@ -56,10 +57,10 @@ TEST4
 
 print DEFAULT <<'TEST4';	# single quotes - minimize chaacter quoting
 use Test::Harness;
-runtests ("t/test1.t");
+runtests ("t/test1.t","t/test2.t","t/test3.t");
 
 print "\nTo run individual tests, type:\n";
-print "    C:\\> perl t/test1.t Page_Pause_Time (0..5)\n";
+print "    C:\\> perl t/test?.t Page_Pause_Time (0..5)\n";
 print "See README and other documentation for additional information.\n\n";
 TEST4
 
