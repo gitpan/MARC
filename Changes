@@ -211,3 +211,9 @@ Revision history for Perl extension MARC.
 	- integrate "102u" changes into CPAN format
 	- fix bug in addfield where add_map not called if ($tag<10)
 
+1.04   Mon Jan 24 22:31:26 CST 2000 <Birthisel>
+	- opps, had to fix the Win32 5.00402 binmode again (c.f 0.98)
+	- added quotes to 'rebuild_map' used as hash key (5.004 warnings)
+	- add docs for "keys" in hash returned by 'unpack_ldr'
+	- add xml format error messages
+

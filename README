@@ -1,5 +1,5 @@
 MARC (manipulate MAchine Readable Cataloging)
-VERSION=1.03, 17 January 2000
+VERSION=1.04, 24 January 2000
 
 This is a cross-platform module. All of the files except README.txt
 are LF-only terminations. You will need a better editor than Notepad
@@ -93,7 +93,7 @@ EXPERIMENTAL ELEMENTS:
 
 A number of functions were added in Version 0.92 by Derek Lane to
 support updating "000" and "008" fields. All of these are experimental
-and ay be subject to changes or syntax refinements. Here are his
+and may be subject to changes or syntax refinements. Here are his
 comments:
 
 	(unpack_ldr): gets an updateable version of the LDR
@@ -139,7 +139,7 @@ documentation is created during the installation (html and man formats).
 
 Download the latest version from CPAN or:
 
-    http://libstaff.lib.odu.edu/depts/systems/iii/scripts/MARCpm
+    http://marcpm.sourceforge.net
 
 AUTHORS:
 

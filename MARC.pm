@@ -5,7 +5,7 @@ use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $DEBUG $TEST
 	    @LDR_FIELDS $LDR_TEMPLATE %FF_FIELDS %FF_TEMPLATE
 	    );
-$VERSION = '1.03';
+$VERSION = '1.04';
 $DEBUG = 0;
 $TEST = 0;
 
@@ -114,6 +114,10 @@ sub new {
 	    $totalrecord = _readmarcmaker($marc);
 	    close *file or mycarp "Close Error: $file, $!";
         }
+        elsif ($format =~ /xml/oi) {
+	    mycarp "XML formats are now handled by MARC::XML";
+	    return;
+        }
         else {
 	    mycarp "I don't recognize that format $!";
 	    return;
@@ -204,7 +208,6 @@ sub _readmarcmaker {
     my $lineterm = $marc->[0]{'lineterm'} || "\015\012";
 	# MS-DOS file default for MARCMaker
     my $recordcount = 0;
-    binmode $handle;
       #Set the file input separator to "\r\n\r\n", which is the same as 
       #a blank line. A single blank line separates individual MARC records
       #in the MARCMakr format.
@@ -416,7 +419,12 @@ sub openmarc {
     }
     else {
 	close *file;
-	mycarp "Unrecognized format $marc->[0]{'format'}";
+        if ($params->{'format'} =~ /xml/oi) {
+	    mycarp "XML formats are now handled by MARC::XML";
+        }
+	else {
+	    mycarp "Unrecognized format $marc->[0]{'format'}";
+        }
 	return;
     }
     print "read in $totalrecord records\n" if $DEBUG;
@@ -1694,7 +1702,7 @@ sub deletefirst {
     my $field = $template->{field};
     my $recnum = $template->{record};
     my $subfield = $template->{subfield};
-    my $do_rebuild_map = $template->{rebuild_map};
+    my $do_rebuild_map = $template->{'rebuild_map'};
     if (!$recnum) {mycarp "Need a record to confine my destructive tendencies"; return undef}
     if (defined($subfield) and $subfield =~/^i[12]$/) {mycarp "Cannot delete indicators"; return undef}
 #I know that $marc->[$recnum]{$field}{field} is this information
@@ -1803,7 +1811,7 @@ sub updatefirst {
     my $field = $template->{field};
     my $recnum = $template->{record};
     my $subfield = $template->{subfield};
-    my $do_rebuild_map = $template->{rebuild_map};
+    my $do_rebuild_map = $template->{'rebuild_map'};
 
     $ufield[0]= $field;
     my $ufield_lt_10_value = $ufield[1];
@@ -1926,7 +1934,7 @@ sub updatefields {
     my $marc = shift || return;
     my $template = shift;
     my $recnum = $template->{record};
-    my $do_rebuild_map = $template->{rebuild_map};
+    my $do_rebuild_map = $template->{'rebuild_map'};
     my $tag = $template->{field};
     my $rafieldrefs = shift;
     my @fieldrefs = @$rafieldrefs;
@@ -2459,6 +2467,25 @@ Installs the ref in $marc as $marc->[$record]{unp_ldr}
     my ($m040) = $x->getvalues({record=>'1',field=>'040'});
     print "First record is LC, let's leave it alone" 
           if $rldr->{FF_Desc} eq 'a' && $m040=~/DLC\s*\c_c\s*DLC/; 
+
+The hash version contains the following information:
+
+	Key		000-Pos	length	Function [standard value]
+	---     	-------	------	--------
+	rec_len		00-04	   5	Logical Record Length
+	RecStat		05	   1	Record Status
+	Type		06	   1	Type of Record
+	BLvl		07	   1	Bibliographic Level
+	Ctrl		08	   1
+	Undefldr	09-11	   3	[x22]
+	base_addr	12-16	   5	Base Address of Data
+	ELvl		17	   1	Encoding Level
+	Desc		18	   1	Descriptive Cataloging Form
+	ln_rec		19	   1	Linked-Record Code
+	len_len_field	20	   1	Length "length of field" [4]
+	len_start_char	21	   1	Length "start char pos" [5]
+	len_impl	22	   1	Length "implementation dep" [0]
+	Undef2ldr	23	   1	[0]
 
 
 =head2 get_hash_ldr($record)

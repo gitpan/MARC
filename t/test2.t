@@ -11,7 +11,7 @@ use lib '.','./t';	# for inheritance and Win32 test
 
 BEGIN { $| = 1; print "1..65\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use MARC 1.01;
+use MARC 1.04;
 $loaded = 1;
 print "ok 1\n";
 

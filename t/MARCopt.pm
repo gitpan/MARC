@@ -2,7 +2,7 @@ package MARCopt;
 # Inheritance test for test3.t only
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
-$VERSION = '0.93';
+$VERSION = '1.04';
 require Exporter;
 use MARC;
 @ISA = qw( Exporter MARC );
